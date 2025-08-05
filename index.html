@@ -48,14 +48,13 @@
             display: grid;
             grid-template-columns: repeat(8, 60px);
             grid-template-rows: repeat(8, 60px);
-            gap: 1px;
+            gap: 0;
             margin: 20px auto;
             border: 4px solid #333;
             border-radius: 8px;
-            background-color: #333;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            width: 488px;
-            height: 488px;
+            width: 480px;
+            height: 480px;
         }
 
         .square {
@@ -260,14 +259,7 @@
             }
 
             renderBoard() {
-                console.log('Rendering board...'); // Debug log
                 const boardElement = document.getElementById('chessboard');
-                
-                if (!boardElement) {
-                    console.error('Board element not found!');
-                    return;
-                }
-                
                 boardElement.innerHTML = '';
                 
                 for (let row = 0; row < 8; row++) {
@@ -278,20 +270,15 @@
                         square.dataset.col = col.toString();
                         
                         const piece = this.board[row][col];
-                        console.log(`Square [${row},${col}]: ${piece}`); // Debug log
-                        
                         if (piece) {
                             const symbol = this.getPieceSymbol(piece);
-                            square.textContent = symbol;
-                            square.style.color = piece === piece.toUpperCase() ? '#fff' : '#000';
+                            square.innerHTML = symbol;
                         }
                         
                         square.addEventListener('click', (e) => this.handleSquareClick(e));
                         boardElement.appendChild(square);
                     }
                 }
-                
-                console.log('Board rendered with', boardElement.children.length, 'squares');
             }
 
             handleSquareClick(event) {
