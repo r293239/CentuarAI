@@ -45,16 +45,19 @@
         }
 
         .chessboard {
-            display: grid;
-            grid-template-columns: repeat(8, 60px);
-            grid-template-rows: repeat(8, 60px);
-            gap: 0;
+            width: 480px;
+            height: 480px;
             margin: 20px auto;
             border: 4px solid #333;
             border-radius: 8px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            width: 480px;
-            height: 480px;
+            position: relative;
+        }
+
+        .board-row {
+            display: flex;
+            width: 100%;
+            height: 60px;
         }
 
         .square {
@@ -67,8 +70,7 @@
             line-height: 1;
             cursor: pointer;
             transition: all 0.2s ease;
-            position: relative;
-            box-sizing: border-box;
+            flex-shrink: 0;
         }
 
         .square.light {
@@ -263,6 +265,9 @@
                 boardElement.innerHTML = '';
                 
                 for (let row = 0; row < 8; row++) {
+                    const rowDiv = document.createElement('div');
+                    rowDiv.className = 'board-row';
+                    
                     for (let col = 0; col < 8; col++) {
                         const square = document.createElement('div');
                         square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
@@ -271,13 +276,14 @@
                         
                         const piece = this.board[row][col];
                         if (piece) {
-                            const symbol = this.getPieceSymbol(piece);
-                            square.innerHTML = symbol;
+                            square.innerHTML = this.getPieceSymbol(piece);
                         }
                         
                         square.addEventListener('click', (e) => this.handleSquareClick(e));
-                        boardElement.appendChild(square);
+                        rowDiv.appendChild(square);
                     }
+                    
+                    boardElement.appendChild(rowDiv);
                 }
             }
 
