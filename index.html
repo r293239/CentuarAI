@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess AI - 1500 ELO</title>
+    <title>Chess AI</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -158,12 +158,12 @@
 </head>
 <body>
     <div class="container">
-        <h1>♔ Chess AI - 1500 ELO ♛</h1>
+        <h1>♔ Chess AI ♛</h1>
         
         <div class="game-info">
             <div><strong>Your Turn:</strong> <span id="current-player">White</span></div>
-            <div><strong>AI Difficulty:</strong> 1500 ELO</div>
-            <div><strong>Search Depth:</strong> <span id="search-depth">4</span></div>
+            <div><strong>AI Difficulty:</strong> Maximum</div>
+            <div><strong>Search Depth:</strong> <span id="search-depth">6</span></div>
         </div>
         
         <div id="status" class="status"></div>
@@ -174,7 +174,6 @@
         <div class="controls">
             <button onclick="newGame()">New Game</button>
             <button onclick="undoMove()" id="undo-btn">Undo Move</button>
-            <button onclick="toggleDifficulty()" id="difficulty-btn">Increase Difficulty</button>
         </div>
         
         <div class="move-history">
@@ -184,8 +183,6 @@
     </div>
 
     <script>
-        // Chess AI Implementation - Target 1500 ELO
-
         class ChessAI {
             constructor() {
                 this.board = this.initializeBoard();
@@ -193,7 +190,7 @@
                 this.selectedSquare = null;
                 this.gameHistory = [];
                 this.moveHistory = [];
-                this.searchDepth = 4;
+                this.searchDepth = 6; // Maximum difficulty
                 this.gameOver = false;
                 
                 // Piece values for evaluation
@@ -325,7 +322,9 @@
 
             highlightSquare(row, col) {
                 const square = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-                square.classList.add('selected');
+                if (square) {
+                    square.classList.add('selected');
+                }
             }
 
             highlightPossibleMoves(row, col) {
@@ -333,7 +332,9 @@
                     for (let c = 0; c < 8; c++) {
                         if (this.isValidMove(row, col, r, c)) {
                             const square = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
-                            square.classList.add('possible-move');
+                            if (square) {
+                                square.classList.add('possible-move');
+                            }
                         }
                     }
                 }
@@ -353,15 +354,16 @@
                 if (!piece) return false;
                 if (targetPiece && this.isPieceOwnedByPlayer(targetPiece, this.currentPlayer)) return false;
                 
+                // Check basic piece movement rules
+                if (!this.isPieceMoveLegal(piece, fromRow, fromCol, toRow, toCol)) return false;
+                
                 // Create a temporary board to test the move
                 const tempBoard = this.board.map(row => [...row]);
                 tempBoard[toRow][toCol] = piece;
                 tempBoard[fromRow][fromCol] = null;
                 
                 // Check if move puts own king in check
-                if (this.isKingInCheck(this.currentPlayer, tempBoard)) return false;
-                
-                return this.isPieceMoveLegal(piece, fromRow, fromCol, toRow, toCol);
+                return !this.isKingInCheckForBoard(tempBoard, this.currentPlayer);
             }
 
             isPieceMoveLegal(piece, fromRow, fromCol, toRow, toCol) {
@@ -427,9 +429,11 @@
                 const piece = this.board[fromRow][fromCol];
                 const capturedPiece = this.board[toRow][toCol];
                 
+                // Save game state for undo
                 this.gameHistory.push({
                     board: this.board.map(row => [...row]),
-                    currentPlayer: this.currentPlayer
+                    currentPlayer: this.currentPlayer,
+                    moveHistory: [...this.moveHistory]
                 });
                 
                 this.board[toRow][toCol] = piece;
@@ -457,8 +461,6 @@
                 document.getElementById('current-player').textContent = this.currentPlayer === 'white' ? 'White' : 'Black';
             }
 
-            // AI LOGIC - Minimax with Alpha-Beta Pruning
-
             makeAIMove() {
                 if (this.gameOver) return;
                 
@@ -477,11 +479,13 @@
 
             getBestMove() {
                 const moves = this.getAllPossibleMoves('black');
+                if (moves.length === 0) return null;
+                
                 let bestMove = null;
                 let bestScore = -Infinity;
                 
                 for (const move of moves) {
-                    const tempBoard = this.makeTemporaryMove(move);
+                    const tempBoard = this.makeTemporaryMoveOnBoard(this.board, move);
                     const score = this.minimax(tempBoard, this.searchDepth - 1, -Infinity, Infinity, false);
                     
                     if (score > bestScore) {
@@ -498,11 +502,12 @@
                     return this.evaluatePosition(board);
                 }
                 
-                const moves = this.getAllPossibleMovesForBoard(board, maximizingPlayer ? 'black' : 'white');
+                const currentPlayer = maximizingPlayer ? 'black' : 'white';
+                const moves = this.getAllPossibleMovesForBoard(board, currentPlayer);
                 
                 if (moves.length === 0) {
                     // Checkmate or stalemate
-                    if (this.isKingInCheckForBoard(board, maximizingPlayer ? 'black' : 'white')) {
+                    if (this.isKingInCheckForBoard(board, currentPlayer)) {
                         return maximizingPlayer ? -10000 + (this.searchDepth - depth) : 10000 - (this.searchDepth - depth);
                     }
                     return 0; // Stalemate
@@ -531,7 +536,7 @@
                 }
             }
 
-            evaluatePosition(board = this.board) {
+            evaluatePosition(board) {
                 let score = 0;
                 
                 for (let row = 0; row < 8; row++) {
@@ -563,11 +568,11 @@
                 
                 switch (pieceType) {
                     case 'p':
-                        return this.pawnTable[adjustedRow][col];
+                        return this.pawnTable[adjustedRow]?.[col] || 0;
                     case 'n':
-                        return this.knightTable[adjustedRow][col];
+                        return this.knightTable[adjustedRow]?.[col] || 0;
                     case 'b':
-                        return this.bishopTable[adjustedRow][col];
+                        return this.bishopTable[adjustedRow]?.[col] || 0;
                     default:
                         return 0;
                 }
@@ -607,15 +612,16 @@
                 if (!piece) return false;
                 if (targetPiece && this.isPieceOwnedByPlayer(targetPiece, player)) return false;
                 
+                // Check basic piece movement rules
+                if (!this.isPieceMoveLegalForBoard(board, piece, fromRow, fromCol, toRow, toCol)) return false;
+                
                 // Create a temporary board to test the move
                 const tempBoard = board.map(row => [...row]);
                 tempBoard[toRow][toCol] = piece;
                 tempBoard[fromRow][fromCol] = null;
                 
                 // Check if move puts own king in check
-                if (this.isKingInCheckForBoard(tempBoard, player)) return false;
-                
-                return this.isPieceMoveLegalForBoard(board, piece, fromRow, fromCol, toRow, toCol);
+                return !this.isKingInCheckForBoard(tempBoard, player);
             }
 
             isPieceMoveLegalForBoard(board, piece, fromRow, fromCol, toRow, toCol) {
@@ -677,20 +683,12 @@
                 return true;
             }
 
-            makeTemporaryMove(move) {
-                return this.makeTemporaryMoveOnBoard(this.board, move);
-            }
-
             makeTemporaryMoveOnBoard(board, move) {
                 const newBoard = board.map(row => [...row]);
                 const piece = newBoard[move.fromRow][move.fromCol];
                 newBoard[move.toRow][move.toCol] = piece;
                 newBoard[move.fromRow][move.fromCol] = null;
                 return newBoard;
-            }
-
-            isKingInCheck(player, board = this.board) {
-                return this.isKingInCheckForBoard(board, player);
             }
 
             isKingInCheckForBoard(board, player) {
@@ -731,7 +729,7 @@
                 const statusElement = document.getElementById('status');
                 const currentPlayerName = this.currentPlayer === 'white' ? 'White' : 'Black';
                 
-                if (this.isKingInCheck(this.currentPlayer)) {
+                if (this.isKingInCheckForBoard(this.board, this.currentPlayer)) {
                     const moves = this.getAllPossibleMoves(this.currentPlayer);
                     if (moves.length === 0) {
                         statusElement.textContent = `Checkmate! ${currentPlayerName === 'White' ? 'Black' : 'White'} wins!`;
@@ -779,30 +777,22 @@
             undoMove() {
                 if (this.gameHistory.length >= 2) {
                     // Undo both player and AI moves
-                    this.gameHistory.pop(); // Remove AI move
-                    const lastState = this.gameHistory.pop(); // Remove player move
+                    this.gameHistory.pop(); // Remove current state
+                    const lastState = this.gameHistory.pop(); // Get previous state
+                    
                     this.board = lastState.board;
                     this.currentPlayer = lastState.currentPlayer;
-                    this.moveHistory.splice(-2, 2);
+                    this.moveHistory = lastState.moveHistory;
                     this.gameOver = false;
                     
                     document.getElementById('current-player').textContent = this.currentPlayer === 'white' ? 'White' : 'Black';
+                    this.clearSelection();
                     this.renderBoard();
                     this.updateStatus();
                     this.updateMoveHistory();
-                }
-            }
-
-            increaseDifficulty() {
-                this.searchDepth = Math.min(this.searchDepth + 1, 6);
-                document.getElementById('search-depth').textContent = this.searchDepth;
-                
-                const difficultyBtn = document.getElementById('difficulty-btn');
-                if (this.searchDepth === 6) {
-                    difficultyBtn.textContent = 'Maximum Difficulty';
-                    difficultyBtn.disabled = true;
-                } else {
-                    difficultyBtn.textContent = 'Increase Difficulty';
+                } else if (this.gameHistory.length === 1) {
+                    // Only one move made, reset to beginning
+                    this.newGame();
                 }
             }
         }
@@ -817,10 +807,6 @@
 
         function undoMove() {
             game.undoMove();
-        }
-
-        function toggleDifficulty() {
-            game.increaseDifficulty();
         }
     </script>
 </body>
