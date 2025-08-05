@@ -54,6 +54,8 @@
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            width: 480px;
+            height: 480px;
         }
 
         .square {
@@ -62,11 +64,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
+            font-size: 36px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s ease;
             position: relative;
+            box-sizing: border-box;
         }
 
         .square.light {
@@ -268,7 +271,12 @@
                         square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
                         square.dataset.row = row;
                         square.dataset.col = col;
-                        square.textContent = this.getPieceSymbol(this.board[row][col]);
+                        
+                        const piece = this.board[row][col];
+                        if (piece) {
+                            square.textContent = this.getPieceSymbol(piece);
+                        }
+                        
                         square.addEventListener('click', (e) => this.handleSquareClick(e));
                         boardElement.appendChild(square);
                     }
