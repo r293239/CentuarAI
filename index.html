@@ -462,27 +462,6 @@
             
             return true;
         }
-            const piece = board[fromRow][fromCol];
-            const capturedPiece = board[toRow][toCol];
-            
-            // Save state for undo
-            gameHistory.push({
-                board: board.map(row => [...row]),
-                currentPlayer: currentPlayer,
-                moveHistory: [...moveHistory]
-            });
-            
-            // Make the move
-            board[toRow][toCol] = piece;
-            board[fromRow][fromCol] = '';
-            
-            // Record move
-            const move = `${piece} ${String.fromCharCode(97 + fromCol)}${8 - fromRow} → ${String.fromCharCode(97 + toCol)}${8 - toRow}`;
-            moveHistory.push(move);
-            updateMoveHistory();
-            
-            createBoard();
-        }
 
         function switchPlayer() {
             currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
@@ -536,28 +515,6 @@
                 '♟': 100, '♞': 320, '♝': 330, '♜': 500, '♛': 900, '♚': 20000
             };
             return values[piece] || 0;
-        }
-
-        function getAllPossibleMoves(player) {
-            const moves = [];
-            for (let fromRow = 0; fromRow < 8; fromRow++) {
-                for (let fromCol = 0; fromCol < 8; fromCol++) {
-                    const piece = board[fromRow][fromCol];
-                    if (piece && isPlayerPiece(piece, player)) {
-                        for (let toRow = 0; toRow < 8; toRow++) {
-                            for (let toCol = 0; toCol < 8; toCol++) {
-                                const oldPlayer = currentPlayer;
-                                currentPlayer = player;
-                                if (isValidMove(fromRow, fromCol, toRow, toCol)) {
-                                    moves.push({ fromRow, fromCol, toRow, toCol });
-                                }
-                                currentPlayer = oldPlayer;
-                            }
-                        }
-                    }
-                }
-            }
-            return moves;
         }
 
         function getAllPossibleMoves(player) {
@@ -650,6 +607,7 @@
                 board = lastState.board;
                 currentPlayer = lastState.currentPlayer;
                 moveHistory = lastState.moveHistory;
+                gameOver = false;
                 
                 document.getElementById('current-player').textContent = currentPlayer === 'white' ? 'White' : 'Black';
                 clearSelection();
@@ -663,6 +621,7 @@
 
         // Initialize the game
         createBoard();
+        updateStatus();
     </script>
 </body>
 </html>
