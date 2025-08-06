@@ -168,7 +168,8 @@
         let moveHistory = [];
         let gameOver = false;
         let humanPlayer = 'white'; // Which side the human is playing
-        let aiDepth = 3; // AI search depth
+        let aiDepth = 4; // AI search depth (increased)
+        let moveCount = 0; // Track move number for opening book
 
         // Piece mappings
         const pieceMap = {
@@ -370,19 +371,54 @@
             gameHistory.push({
                 board: board.map(row => [...row]),
                 currentPlayer: currentPlayer,
-                moveHistory: [...moveHistory]
+                moveHistory: [...moveHistory],
+                moveCount: moveCount
             });
             
             // Make the move
             board[toRow][toCol] = piece;
             board[fromRow][fromCol] = '';
             
-            // Record move
-            const move = `${piece} ${String.fromCharCode(97 + fromCol)}${8 - fromRow} → ${String.fromCharCode(97 + toCol)}${8 - toRow}`;
-            moveHistory.push(move);
+            // Increment move counter
+            if (currentPlayer === 'white') {
+                moveCount++;
+            }
+            
+            // Record move in algebraic notation
+            const moveNotation = getMoveNotation(piece, fromRow, fromCol, toRow, toCol, capturedPiece);
+            moveHistory.push(moveNotation);
             updateMoveHistory();
             
             createBoard();
+        }
+
+        function getMoveNotation(piece, fromRow, fromCol, toRow, toCol, capturedPiece) {
+            const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+            const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+            
+            const fromSquare = files[fromCol] + ranks[fromRow];
+            const toSquare = files[toCol] + ranks[toRow];
+            
+            let notation = '';
+            const pieceSymbol = piece.toLowerCase();
+            
+            if (pieceSymbol === '♟' || pieceSymbol === '♙') {
+                if (capturedPiece) {
+                    notation = files[fromCol] + 'x' + toSquare;
+                } else {
+                    notation = toSquare;
+                }
+            } else {
+                const pieceChar = pieceSymbol === '♞' || pieceSymbol === '♘' ? 'N' :
+                                 pieceSymbol === '♝' || pieceSymbol === '♗' ? 'B' :
+                                 pieceSymbol === '♜' || pieceSymbol === '♖' ? 'R' :
+                                 pieceSymbol === '♛' || pieceSymbol === '♕' ? 'Q' :
+                                 pieceSymbol === '♚' || pieceSymbol === '♔' ? 'K' : '';
+                
+                notation = pieceChar + (capturedPiece ? 'x' : '') + toSquare;
+            }
+            
+            return notation;
         }
 
         function isKingInCheck(testBoard, player) {
@@ -472,6 +508,44 @@
             document.getElementById('current-player').textContent = currentPlayer === 'white' ? 'White' : 'Black';
         }
 
+        // Opening book with popular openings
+        const openingBook = {
+            // Italian Game
+            "": [{ move: "e2-e4", weight: 40 }], // 1.e4
+            "e7-e5": [{ move: "Ng1-f3", weight: 50 }], // 2.Nf3
+            "e7-e5,Nb8-c6": [{ move: "Bf1-c4", weight: 40 }], // 3.Bc4 (Italian)
+            
+            // Spanish Opening (Ruy Lopez)
+            "e7-e5,Nb8-c6": [
+                { move: "Bf1-c4", weight: 40 }, // Italian
+                { move: "Bf1-b5", weight: 35 }  // Spanish
+            ],
+            
+            // French Defense response
+            "e7-e6": [{ move: "d2-d4", weight: 45 }], // 2.d4
+            "e7-e6,d7-d5": [{ move: "Nb1-c3", weight: 40 }], // 3.Nc3
+            
+            // Sicilian Defense response
+            "c7-c5": [{ move: "Ng1-f3", weight: 50 }], // 2.Nf3
+            "c7-c5,d7-d6": [{ move: "d2-d4", weight: 45 }], // 3.d4
+            "c7-c5,Nb8-c6": [{ move: "d2-d4", weight: 45 }],
+            
+            // Queen's Gambit
+            "d7-d5": [{ move: "d2-d4", weight: 45 }], // Also 1.d4
+            "d7-d5,Ng8-f6": [{ move: "c2-c4", weight: 40 }], // 2.c4 Queen's Gambit
+            
+            // King's Indian Defense response
+            "Ng8-f6": [{ move: "d2-d4", weight: 45 }],
+            "Ng8-f6,g7-g6": [{ move: "c2-c4", weight: 40 }],
+            
+            // English Opening
+            "": [
+                { move: "e2-e4", weight: 40 },
+                { move: "d2-d4", weight: 35 },
+                { move: "c2-c4", weight: 20 }  // English Opening
+            ]
+        };
+
         function makeAIMove() {
             if (gameOver) return;
             
@@ -479,7 +553,17 @@
             
             setTimeout(() => {
                 const aiPlayer = humanPlayer === 'white' ? 'black' : 'white';
-                const bestMove = getBestMoveMinMax(aiPlayer, aiDepth);
+                let bestMove = null;
+                
+                // Use opening book for first 10 moves
+                if (moveCount <= 5) {
+                    bestMove = getOpeningMove(aiPlayer);
+                }
+                
+                // If no opening move found, use minimax
+                if (!bestMove) {
+                    bestMove = getBestMoveMinMax(aiPlayer, aiDepth);
+                }
                 
                 if (bestMove) {
                     makeMove(bestMove.fromRow, bestMove.fromCol, bestMove.toRow, bestMove.toCol);
@@ -487,7 +571,148 @@
                     updateStatus();
                 }
                 document.getElementById('thinking').style.display = 'none';
-            }, 800);
+            }, 1200);
+        }
+
+        function getOpeningMove(player) {
+            // Build current game state string
+            const gameState = buildGameStateString();
+            
+            // Check if current position is in opening book
+            if (openingBook[gameState]) {
+                const possibleMoves = openingBook[gameState];
+                
+                // Select move based on weights
+                const totalWeight = possibleMoves.reduce((sum, move) => sum + move.weight, 0);
+                let random = Math.random() * totalWeight;
+                
+                for (const moveData of possibleMoves) {
+                    random -= moveData.weight;
+                    if (random <= 0) {
+                        return parseOpeningMove(moveData.move, player);
+                    }
+                }
+            }
+            
+            // If not in book, use basic opening principles
+            return getBasicOpeningMove(player);
+        }
+
+        function buildGameStateString() {
+            // Simple representation of key moves played
+            // This is a simplified approach - in practice, you'd want more sophisticated position tracking
+            return moveHistory.slice(0, Math.min(moveHistory.length, 6)).join(',');
+        }
+
+        function parseOpeningMove(moveStr, player) {
+            // Parse moves like "e2-e4" or "Ng1-f3"
+            const parts = moveStr.split('-');
+            if (parts.length !== 2) return null;
+            
+            const fromSquare = parts[0];
+            const toSquare = parts[1];
+            
+            // Convert algebraic notation to array indices
+            const fromCol = fromSquare.charCodeAt(fromSquare.length - 2) - 97; // 'a' = 0
+            const fromRow = 8 - parseInt(fromSquare.charAt(fromSquare.length - 1));
+            const toCol = toSquare.charCodeAt(toSquare.length - 2) - 97;
+            const toRow = 8 - parseInt(toSquare.charAt(toSquare.length - 1));
+            
+            // Verify the move is legal
+            if (isValidMove(fromRow, fromCol, toRow, toCol)) {
+                return { fromRow, fromCol, toRow, toCol };
+            }
+            
+            return null;
+        }
+
+        function getBasicOpeningMove(player) {
+            const moves = getAllPossibleMoves(player);
+            
+            // Opening principles priority list
+            const priorities = [
+                // 1. Control center with pawns
+                (move) => {
+                    const piece = board[move.fromRow][move.fromCol];
+                    if ((piece === '♟' || piece === '♙')) {
+                        // e4, d4, e5, d5
+                        if ((move.toRow === 4 && (move.toCol === 4 || move.toCol === 3)) ||
+                            (move.toRow === 3 && (move.toCol === 4 || move.toCol === 3))) {
+                            return 100;
+                        }
+                        // Other center pawns
+                        if (move.toRow >= 2 && move.toRow <= 5 && move.toCol >= 2 && move.toCol <= 5) {
+                            return 50;
+                        }
+                    }
+                    return 0;
+                },
+                
+                // 2. Develop knights toward center
+                (move) => {
+                    const piece = board[move.fromRow][move.fromCol];
+                    if (piece === '♞' || piece === '♘') {
+                        // Knights to f3, c3, f6, c6
+                        if ((move.toRow === 5 && (move.toCol === 5 || move.toCol === 2)) ||
+                            (move.toRow === 2 && (move.toCol === 5 || move.toCol === 2))) {
+                            return 80;
+                        }
+                        // Other knight development
+                        if (move.toRow >= 2 && move.toRow <= 5 && move.toCol >= 1 && move.toCol <= 6) {
+                            return 60;
+                        }
+                    }
+                    return 0;
+                },
+                
+                // 3. Develop bishops
+                (move) => {
+                    const piece = board[move.fromRow][move.fromCol];
+                    if (piece === '♝' || piece === '♗') {
+                        // Good bishop squares
+                        if ((move.toRow === 4 && move.toCol === 2) || // c4
+                            (move.toRow === 3 && move.toCol === 5) || // f5
+                            (move.toRow === 2 && move.toCol === 4) || // e6
+                            (move.toRow === 5 && move.toCol === 3)) { // d3
+                            return 70;
+                        }
+                        return 40;
+                    }
+                    return 0;
+                },
+                
+                // 4. Castle early
+                (move) => {
+                    const piece = board[move.fromRow][move.fromCol];
+                    if (piece === '♚' || piece === '♔') {
+                        // Castling moves (simplified detection)
+                        if (Math.abs(move.toCol - move.fromCol) === 2) {
+                            return 90;
+                        }
+                    }
+                    return 0;
+                }
+            ];
+            
+            let bestMove = null;
+            let bestScore = -1;
+            
+            for (const move of moves) {
+                let score = 0;
+                for (const priority of priorities) {
+                    score += priority(move);
+                }
+                
+                // Add small random factor
+                score += Math.random() * 5;
+                
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = move;
+                }
+            }
+            
+            return bestMove || moves[0]; // Fallback to first legal move
         }
 
         // Advanced AI using Minimax algorithm with Alpha-Beta pruning
@@ -577,6 +802,7 @@
         function evaluatePosition() {
             let score = 0;
             
+            // Material and positional evaluation
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     const piece = board[row][col];
@@ -593,13 +819,189 @@
                 }
             }
             
-            // Bonus for controlling center
+            // Advanced evaluations
             score += evaluateCenter();
-            
-            // King safety evaluation
             score += evaluateKingSafety('white') - evaluateKingSafety('black');
+            score += evaluateDevelopment('white') - evaluateDevelopment('black');
+            score += evaluatePawnStructure('white') - evaluatePawnStructure('black');
+            score += evaluateThreatsMate('white') - evaluateThreatsMate('black');
             
             return humanPlayer === 'white' ? score : -score;
+        }
+
+        function evaluateDevelopment(player) {
+            let development = 0;
+            const backRank = player === 'white' ? 7 : 0;
+            const isEarlyGame = moveCount < 10;
+            
+            if (!isEarlyGame) return 0;
+            
+            // Penalty for pieces still on back rank
+            for (let col = 0; col < 8; col++) {
+                const piece = board[backRank][col];
+                if (piece && isPlayerPiece(piece, player)) {
+                    const pieceType = piece.toLowerCase();
+                    if (pieceType === '♞' || pieceType === '♘' || 
+                        pieceType === '♝' || pieceType === '♗') {
+                        development -= 15; // Penalty for undeveloped pieces
+                    }
+                }
+            }
+            
+            // Bonus for developed pieces
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const piece = board[row][col];
+                    if (piece && isPlayerPiece(piece, player)) {
+                        const pieceType = piece.toLowerCase();
+                        if ((pieceType === '♞' || pieceType === '♘') && 
+                            ((player === 'white' && row < 7) || (player === 'black' && row > 0))) {
+                            development += 10;
+                        }
+                        if ((pieceType === '♝' || pieceType === '♗') && 
+                            ((player === 'white' && row < 7) || (player === 'black' && row > 0))) {
+                            development += 8;
+                        }
+                    }
+                }
+            }
+            
+            return development;
+        }
+
+        function evaluatePawnStructure(player) {
+            let score = 0;
+            const direction = player === 'white' ? -1 : 1;
+            const pawn = player === 'white' ? '♙' : '♟';
+            
+            for (let col = 0; col < 8; col++) {
+                let pawnCount = 0;
+                let advanced = false;
+                
+                for (let row = 0; row < 8; row++) {
+                    if (board[row][col] === pawn) {
+                        pawnCount++;
+                        // Bonus for advanced pawns
+                        const advancement = player === 'white' ? (7 - row) : row;
+                        if (advancement > 4) {
+                            score += advancement * 5;
+                            advanced = true;
+                        }
+                    }
+                }
+                
+                // Penalty for doubled pawns
+                if (pawnCount > 1) {
+                    score -= 10 * (pawnCount - 1);
+                }
+                
+                // Bonus for passed pawns (simplified check)
+                if (pawnCount === 1 && advanced) {
+                    let passed = true;
+                    const enemyPawn = player === 'white' ? '♟' : '♙';
+                    
+                    // Check adjacent files for enemy pawns
+                    for (let checkCol = Math.max(0, col - 1); checkCol <= Math.min(7, col + 1); checkCol++) {
+                        for (let row = 0; row < 8; row++) {
+                            if (board[row][checkCol] === enemyPawn) {
+                                const enemyAdvancement = player === 'white' ? row : (7 - row);
+                                if (enemyAdvancement < 4) {
+                                    passed = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!passed) break;
+                    }
+                    
+                    if (passed) {
+                        score += 20;
+                    }
+                }
+            }
+            
+            return score;
+        }
+
+        function evaluateThreatsMate(player) {
+            let threats = 0;
+            const enemy = player === 'white' ? 'black' : 'white';
+            
+            // Check for checkmate threats (simplified)
+            if (isKingInCheck(board, enemy)) {
+                const enemyMoves = getAllPossibleMoves(enemy);
+                if (enemyMoves.length === 0) {
+                    return 10000; // Checkmate
+                } else if (enemyMoves.length < 3) {
+                    threats += 100; // Severe pressure
+                }
+            }
+            
+            // Look for tactics: forks, pins, skewers (basic detection)
+            for (let fromRow = 0; fromRow < 8; fromRow++) {
+                for (let fromCol = 0; fromCol < 8; fromCol++) {
+                    const piece = board[fromRow][fromCol];
+                    if (piece && isPlayerPiece(piece, player)) {
+                        threats += evaluateTacticalThreats(piece, fromRow, fromCol, enemy);
+                    }
+                }
+            }
+            
+            return threats;
+        }
+
+        function evaluateTacticalThreats(piece, fromRow, fromCol, enemyColor) {
+            let threats = 0;
+            const pieceType = piece.toLowerCase();
+            
+            // Check all possible moves for this piece
+            for (let toRow = 0; toRow < 8; toRow++) {
+                for (let toCol = 0; toCol < 8; toCol++) {
+                    if (isValidMove(fromRow, fromCol, toRow, toCol)) {
+                        const targetPiece = board[toRow][toCol];
+                        
+                        // Direct capture threat
+                        if (targetPiece && isPlayerPiece(targetPiece, enemyColor)) {
+                            threats += getPieceValue(targetPiece) / 10;
+                        }
+                        
+                        // Fork detection (simplified)
+                        if (pieceType === '♞' || pieceType === '♘' || 
+                            pieceType === '♟' || pieceType === '♙') {
+                            let attackCount = 0;
+                            const directions = getAttackDirections(pieceType);
+                            
+                            for (const [dr, dc] of directions) {
+                                const checkRow = toRow + dr;
+                                const checkCol = toCol + dc;
+                                if (checkRow >= 0 && checkRow < 8 && checkCol >= 0 && checkCol < 8) {
+                                    const checkPiece = board[checkRow][checkCol];
+                                    if (checkPiece && isPlayerPiece(checkPiece, enemyColor)) {
+                                        attackCount++;
+                                    }
+                                }
+                            }
+                            
+                            if (attackCount >= 2) {
+                                threats += 30; // Fork bonus
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return threats;
+        }
+
+        function getAttackDirections(pieceType) {
+            switch (pieceType) {
+                case '♞': case '♘':
+                    return [[-2,-1], [-2,1], [-1,-2], [-1,2], [1,-2], [1,2], [2,-1], [2,1]];
+                case '♟': case '♙':
+                    return pieceType === '♙' ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]];
+                default:
+                    return [];
+            }
         }
 
         function getPositionValue(piece, row, col) {
@@ -801,6 +1203,7 @@
             selectedSquare = null;
             gameHistory = [];
             moveHistory = [];
+            moveCount = 0;
             gameOver = false;
             
             document.getElementById('current-player').textContent = 'White';
@@ -835,6 +1238,7 @@
                 board = lastState.board;
                 currentPlayer = lastState.currentPlayer;
                 moveHistory = lastState.moveHistory;
+                moveCount = lastState.moveCount;
                 gameOver = false;
                 
                 document.getElementById('current-player').textContent = currentPlayer === 'white' ? 'White' : 'Black';
