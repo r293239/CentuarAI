@@ -1727,7 +1727,54 @@
                 newGame();
             }
         }
-
+        function makeAIMove() {
+            if (gameOver) return;
+            
+            document.getElementById('thinking').style.display = 'block';
+            
+            setTimeout(() => {
+                const aiPlayer = humanPlayer === 'white' ? 'black' : 'white';
+                let bestMove = null;
+                
+                // Use opening book for first 5 moves only (reduced)
+                if (moveCount <= 3) {
+                    try {
+                        bestMove = getOpeningMove(aiPlayer);
+                    } catch (e) {
+                        console.log("Opening book failed, using minimax");
+                        bestMove = null;
+                    }
+                }
+                
+                // If no opening move found, use minimax with timeout protection
+                if (!bestMove) {
+                    try {
+                        bestMove = getBestMoveMinMax(aiPlayer, Math.min(aiDepth, 3)); // Reduced depth
+                    } catch (e) {
+                        console.log("Minimax failed, using random move");
+                        const allMoves = getAllPossibleMoves(aiPlayer);
+                        if (allMoves.length > 0) {
+                            bestMove = allMoves[Math.floor(Math.random() * allMoves.length)];
+                        }
+                    }
+                }
+                
+                // Final fallback - just pick any legal move
+                if (!bestMove) {
+                    const allMoves = getAllPossibleMoves(aiPlayer);
+                    if (allMoves.length > 0) {
+                        bestMove = allMoves[0];
+                    }
+                }
+                
+                if (bestMove) {
+                    makeMove(bestMove.fromRow, bestMove.fromCol, bestMove.toRow, bestMove.toCol);
+                    switchPlayer();
+                    updateStatus();
+                }
+                document.getElementById('thinking').style.display = 'none';
+            }, 800); // Reduced thinking time
+        }
         // Initialize the game
         createBoard();
         updateStatus();
