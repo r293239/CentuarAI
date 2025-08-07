@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Centuar AI</title>
+    <title>Chess AI</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -167,9 +167,9 @@
         let gameHistory = [];
         let moveHistory = [];
         let gameOver = false;
-        let humanPlayer = 'white'; // Which side the human is playing
-        let aiDepth = 4; // AI search depth (increased)
-        let moveCount = 0; // Track move number for opening book
+        let humanPlayer = 'white';
+        let aiDepth = 4;
+        let moveCount = 0;
         
         // Castling rights
         let castlingRights = {
@@ -193,6 +193,22 @@
             'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
         };
 
+        // Opening book with popular openings
+        const openingBook = {
+            "": [{ move: "e2-e4", weight: 40 }],
+            "e7-e5": [{ move: "Ng1-f3", weight: 50 }],
+            "e7-e5,Nb8-c6": [{ move: "Bf1-c4", weight: 40 }],
+            "e7-e6": [{ move: "d2-d4", weight: 45 }],
+            "e7-e6,d7-d5": [{ move: "Nb1-c3", weight: 40 }],
+            "c7-c5": [{ move: "Ng1-f3", weight: 50 }],
+            "c7-c5,d7-d6": [{ move: "d2-d4", weight: 45 }],
+            "c7-c5,Nb8-c6": [{ move: "d2-d4", weight: 45 }],
+            "d7-d5": [{ move: "d2-d4", weight: 45 }],
+            "d7-d5,Ng8-f6": [{ move: "c2-c4", weight: 40 }],
+            "Ng8-f6": [{ move: "d2-d4", weight: 45 }],
+            "Ng8-f6,g7-g6": [{ move: "c2-c4", weight: 40 }]
+        };
+
         function createBoard() {
             const boardElement = document.getElementById('chessboard');
             boardElement.innerHTML = '';
@@ -203,17 +219,13 @@
                     square.className = 'square';
                     square.id = `square-${row}-${col}`;
                     
-                    // Alternate colors
                     if ((row + col) % 2 === 0) {
                         square.classList.add('light');
                     } else {
                         square.classList.add('dark');
                     }
                     
-                    // Add piece
                     square.textContent = board[row][col];
-                    
-                    // Add click handler
                     square.onclick = () => handleSquareClick(row, col);
                     
                     boardElement.appendChild(square);
@@ -228,12 +240,10 @@
             const piece = board[row][col];
             
             if (selectedSquare) {
-                // Try to make a move
                 const fromRow = selectedSquare.row;
                 const fromCol = selectedSquare.col;
                 
                 if (fromRow === row && fromCol === col) {
-                    // Clicking same square - deselect
                     clearSelection();
                     return;
                 }
@@ -248,7 +258,6 @@
                         setTimeout(makeAIMove, 500);
                     }
                 } else {
-                    // Select new piece if it belongs to current player
                     if (piece && isPlayerPiece(piece, currentPlayer)) {
                         selectSquare(row, col);
                     } else {
@@ -256,7 +265,6 @@
                     }
                 }
             } else {
-                // Select piece if it belongs to current player
                 if (piece && isPlayerPiece(piece, currentPlayer)) {
                     selectSquare(row, col);
                 }
@@ -274,10 +282,9 @@
             selectedSquare = null;
             document.querySelectorAll('.square').forEach(sq => {
                 sq.classList.remove('selected', 'possible-move');
-                sq.style.backgroundColor = ''; // Clear special colors
+                sq.style.backgroundColor = '';
             });
             
-            // Restore original colors
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     const square = document.getElementById(`square-${row}-${col}`);
@@ -298,16 +305,14 @@
                         const square = document.getElementById(`square-${r}-${c}`);
                         square.classList.add('possible-move');
                         
-                        // Special highlighting for castling
                         const piece = board[row][col];
                         if ((piece === '♔' || piece === '♚') && Math.abs(c - col) === 2) {
-                            square.style.backgroundColor = '#FFD700'; // Gold for castling
+                            square.style.backgroundColor = '#FFD700';
                         }
                         
-                        // Special highlighting for en passant
                         if ((piece === '♙' || piece === '♟') && enPassantTarget && 
                             r === enPassantTarget.row && c === enPassantTarget.col) {
-                            square.style.backgroundColor = '#FF69B4'; // Pink for en passant
+                            square.style.backgroundColor = '#FF69B4';
                         }
                     }
                 }
@@ -335,27 +340,21 @@
             if (!piece) return false;
             if (targetPiece && isPlayerPiece(targetPiece, currentPlayer)) return false;
             
-            // Check for castling
             if ((piece === '♔' || piece === '♚') && Math.abs(toCol - fromCol) === 2) {
                 return canCastle(fromRow, fromCol, toRow, toCol);
             }
             
-            // Check for en passant
             if ((piece === '♙' || piece === '♟') && Math.abs(toCol - fromCol) === 1 && !targetPiece && enPassantTarget) {
                 if (toRow === enPassantTarget.row && toCol === enPassantTarget.col) {
                     return true;
                 }
             }
             
-            // Check basic piece movement
             const pieceCode = pieceMap[piece];
             if (!isValidPieceMove(pieceCode, fromRow, fromCol, toRow, toCol)) return false;
             
-            // Test if move would leave king in check
             const tempBoard = board.map(row => [...row]);
-            const tempEnPassant = enPassantTarget;
             
-            // Handle en passant capture in test
             if ((piece === '♙' || piece === '♟') && toRow === enPassantTarget?.row && toCol === enPassantTarget?.col) {
                 const capturedPawnRow = piece === '♙' ? toRow + 1 : toRow - 1;
                 tempBoard[capturedPawnRow][toCol] = '';
@@ -372,7 +371,6 @@
             const isWhite = piece === '♔';
             const isKingside = toCol > fromCol;
             
-            // Check castling rights
             if (isWhite) {
                 if (isKingside && !castlingRights.whiteKingside) return false;
                 if (!isKingside && !castlingRights.whiteQueenside) return false;
@@ -381,18 +379,14 @@
                 if (!isKingside && !castlingRights.blackQueenside) return false;
             }
             
-            // Check if king is in check
             if (isKingInCheck(board, currentPlayer)) return false;
             
-            // Check if path is clear and king doesn't move through check
             const rookCol = isKingside ? 7 : 0;
             const direction = isKingside ? 1 : -1;
             
-            // Check if rook is in correct position
             const expectedRook = isWhite ? '♖' : '♜';
             if (board[fromRow][rookCol] !== expectedRook) return false;
             
-            // Check squares between king and rook are empty
             const start = Math.min(fromCol, rookCol) + 1;
             const end = Math.max(fromCol, rookCol);
             
@@ -400,7 +394,6 @@
                 if (board[fromRow][col] !== '') return false;
             }
             
-            // Check king doesn't move through check
             for (let col = fromCol; col !== toCol + direction; col += direction) {
                 const testBoard = board.map(row => [...row]);
                 testBoard[fromRow][col] = piece;
@@ -423,11 +416,11 @@
                     const direction = piece === 'P' ? -1 : 1;
                     const startRow = piece === 'P' ? 6 : 1;
                     
-                    if (dx === 0) { // Moving forward
+                    if (dx === 0) {
                         if (dy === direction && !board[toRow][toCol]) return true;
                         if (fromRow === startRow && dy === 2 * direction && !board[toRow][toCol]) return true;
                     } else if (absDx === 1 && dy === direction && board[toRow][toCol]) {
-                        return true; // Capturing
+                        return true;
                     }
                     return false;
                     
@@ -470,7 +463,6 @@
             const piece = board[fromRow][fromCol];
             const capturedPiece = board[toRow][toCol];
             
-            // Save state for undo
             gameHistory.push({
                 board: board.map(row => [...row]),
                 currentPlayer: currentPlayer,
@@ -480,47 +472,37 @@
                 enPassantTarget: enPassantTarget
             });
             
-            // Handle castling
             if ((piece === '♔' || piece === '♚') && Math.abs(toCol - fromCol) === 2) {
                 const isKingside = toCol > fromCol;
                 const rookFromCol = isKingside ? 7 : 0;
                 const rookToCol = isKingside ? 5 : 3;
                 const rook = board[fromRow][rookFromCol];
                 
-                // Move rook
                 board[fromRow][rookToCol] = rook;
                 board[fromRow][rookFromCol] = '';
             }
             
-            // Handle en passant capture
             if ((piece === '♙' || piece === '♟') && enPassantTarget && 
                 toRow === enPassantTarget.row && toCol === enPassantTarget.col) {
                 const capturedPawnRow = piece === '♙' ? toRow + 1 : toRow - 1;
                 board[capturedPawnRow][toCol] = '';
             }
             
-            // Make the move
             board[toRow][toCol] = piece;
             board[fromRow][fromCol] = '';
             
-            // Handle pawn promotion
             if ((piece === '♙' && toRow === 0) || (piece === '♟' && toRow === 7)) {
                 const promotedPiece = getPromotionPiece(piece);
                 board[toRow][toCol] = promotedPiece;
             }
             
-            // Update castling rights
             updateCastlingRights(piece, fromRow, fromCol, toRow, toCol);
-            
-            // Update en passant target
             updateEnPassantTarget(piece, fromRow, toRow, toCol);
             
-            // Increment move counter
             if (currentPlayer === 'white') {
                 moveCount++;
             }
             
-            // Record move in algebraic notation
             const moveNotation = getMoveNotation(piece, fromRow, fromCol, toRow, toCol, capturedPiece);
             moveHistory.push(moveNotation);
             updateMoveHistory();
@@ -529,15 +511,12 @@
         }
 
         function getPromotionPiece(pawn) {
-            // For AI, always promote to queen (best piece)
             if (currentPlayer !== humanPlayer) {
                 return pawn === '♙' ? '♕' : '♛';
             }
             
-            // For human player, ask for choice
             const isWhite = pawn === '♙';
             const pieces = isWhite ? ['♕', '♖', '♗', '♘'] : ['♛', '♜', '♝', '♞'];
-            const choices = ['Queen', 'Rook', 'Bishop', 'Knight'];
             
             let choice = 0;
             const userChoice = prompt(`Promote pawn to:\n0 - Queen\n1 - Rook\n2 - Bishop\n3 - Knight`, '0');
@@ -552,7 +531,6 @@
         }
 
         function updateCastlingRights(piece, fromRow, fromCol, toRow, toCol) {
-            // King moves
             if (piece === '♔') {
                 castlingRights.whiteKingside = false;
                 castlingRights.whiteQueenside = false;
@@ -561,7 +539,6 @@
                 castlingRights.blackQueenside = false;
             }
             
-            // Rook moves or is captured
             if (piece === '♖' || (fromRow === 7 && fromCol === 0)) {
                 castlingRights.whiteQueenside = false;
             }
@@ -575,7 +552,6 @@
                 castlingRights.blackKingside = false;
             }
             
-            // Rook captured
             if (toRow === 7 && toCol === 0) castlingRights.whiteQueenside = false;
             if (toRow === 7 && toCol === 7) castlingRights.whiteKingside = false;
             if (toRow === 0 && toCol === 0) castlingRights.blackQueenside = false;
@@ -583,10 +559,8 @@
         }
 
         function updateEnPassantTarget(piece, fromRow, toRow, toCol) {
-            // Clear previous en passant target
             enPassantTarget = null;
             
-            // Check for pawn double move
             if ((piece === '♙' || piece === '♟') && Math.abs(toRow - fromRow) === 2) {
                 enPassantTarget = {
                     row: piece === '♙' ? fromRow - 1 : fromRow + 1,
@@ -603,21 +577,18 @@
             const toSquare = files[toCol] + ranks[toRow];
             
             let notation = '';
-            const pieceSymbol = piece.toLowerCase();
             
-            // Castling notation
             if ((piece === '♔' || piece === '♚') && Math.abs(toCol - fromCol) === 2) {
                 return toCol > fromCol ? 'O-O' : 'O-O-O';
             }
             
-            if (pieceSymbol === '♟' || pieceSymbol === '♙') {
+            if (piece === '♟' || piece === '♙') {
                 if (capturedPiece || (enPassantTarget && toRow === enPassantTarget.row && toCol === enPassantTarget.col)) {
                     notation = files[fromCol] + 'x' + toSquare;
                 } else {
                     notation = toSquare;
                 }
                 
-                // Add promotion notation
                 if ((piece === '♙' && toRow === 0) || (piece === '♟' && toRow === 7)) {
                     const promotedPiece = board[toRow][toCol];
                     const promotionSymbol = promotedPiece === '♕' || promotedPiece === '♛' ? 'Q' :
@@ -626,11 +597,11 @@
                     notation += '=' + promotionSymbol;
                 }
             } else {
-                const pieceChar = pieceSymbol === '♞' || pieceSymbol === '♘' ? 'N' :
-                                 pieceSymbol === '♝' || pieceSymbol === '♗' ? 'B' :
-                                 pieceSymbol === '♜' || pieceSymbol === '♖' ? 'R' :
-                                 pieceSymbol === '♛' || pieceSymbol === '♕' ? 'Q' :
-                                 pieceSymbol === '♚' || pieceSymbol === '♔' ? 'K' : '';
+                const pieceChar = piece === '♞' || piece === '♘' ? 'N' :
+                                 piece === '♝' || piece === '♗' ? 'B' :
+                                 piece === '♜' || piece === '♖' ? 'R' :
+                                 piece === '♛' || piece === '♕' ? 'Q' :
+                                 piece === '♚' || piece === '♔' ? 'K' : '';
                 
                 notation = pieceChar + (capturedPiece ? 'x' : '') + toSquare;
             }
@@ -639,7 +610,6 @@
         }
 
         function isKingInCheck(testBoard, player) {
-            // Find the king
             const kingSymbol = player === 'white' ? '♔' : '♚';
             let kingRow = -1, kingCol = -1;
             
@@ -654,9 +624,8 @@
                 if (kingRow !== -1) break;
             }
             
-            if (kingRow === -1) return false; // King not found
+            if (kingRow === -1) return false;
             
-            // Check if any enemy piece can attack the king
             const enemyPlayer = player === 'white' ? 'black' : 'white';
             
             for (let row = 0; row < 8; row++) {
@@ -725,44 +694,6 @@
             document.getElementById('current-player').textContent = currentPlayer === 'white' ? 'White' : 'Black';
         }
 
-        // Opening book with popular openings
-        const openingBook = {
-            // Italian Game
-            "": [{ move: "e2-e4", weight: 40 }], // 1.e4
-            "e7-e5": [{ move: "Ng1-f3", weight: 50 }], // 2.Nf3
-            "e7-e5,Nb8-c6": [{ move: "Bf1-c4", weight: 40 }], // 3.Bc4 (Italian)
-            
-            // Spanish Opening (Ruy Lopez)
-            "e7-e5,Nb8-c6": [
-                { move: "Bf1-c4", weight: 40 }, // Italian
-                { move: "Bf1-b5", weight: 35 }  // Spanish
-            ],
-            
-            // French Defense response
-            "e7-e6": [{ move: "d2-d4", weight: 45 }], // 2.d4
-            "e7-e6,d7-d5": [{ move: "Nb1-c3", weight: 40 }], // 3.Nc3
-            
-            // Sicilian Defense response
-            "c7-c5": [{ move: "Ng1-f3", weight: 50 }], // 2.Nf3
-            "c7-c5,d7-d6": [{ move: "d2-d4", weight: 45 }], // 3.d4
-            "c7-c5,Nb8-c6": [{ move: "d2-d4", weight: 45 }],
-            
-            // Queen's Gambit
-            "d7-d5": [{ move: "d2-d4", weight: 45 }], // Also 1.d4
-            "d7-d5,Ng8-f6": [{ move: "c2-c4", weight: 40 }], // 2.c4 Queen's Gambit
-            
-            // King's Indian Defense response
-            "Ng8-f6": [{ move: "d2-d4", weight: 45 }],
-            "Ng8-f6,g7-g6": [{ move: "c2-c4", weight: 40 }],
-            
-            // English Opening
-            "": [
-                { move: "e2-e4", weight: 40 },
-                { move: "d2-d4", weight: 35 },
-                { move: "c2-c4", weight: 20 }  // English Opening
-            ]
-        };
-
         function makeAIMove() {
             if (gameOver) return;
             
@@ -772,14 +703,37 @@
                 const aiPlayer = humanPlayer === 'white' ? 'black' : 'white';
                 let bestMove = null;
                 
-                // Use opening book for first 10 moves
-                if (moveCount <= 5) {
-                    bestMove = getOpeningMove(aiPlayer);
+                // Check for emergency moves first
+                bestMove = findEmergencyMove(aiPlayer);
+                
+                // Use opening book for first few moves
+                if (!bestMove && moveCount <= 3) {
+                    try {
+                        bestMove = getOpeningMove(aiPlayer);
+                    } catch (e) {
+                        console.log("Opening book failed, using minimax");
+                    }
                 }
                 
-                // If no opening move found, use minimax
+                // Use minimax with timeout protection
                 if (!bestMove) {
-                    bestMove = getBestMoveMinMax(aiPlayer, aiDepth);
+                    try {
+                        bestMove = getBestMoveMinMax(aiPlayer, Math.min(aiDepth, 3));
+                    } catch (e) {
+                        console.log("Minimax failed, using random move");
+                        const allMoves = getAllPossibleMoves(aiPlayer);
+                        if (allMoves.length > 0) {
+                            bestMove = allMoves[Math.floor(Math.random() * allMoves.length)];
+                        }
+                    }
+                }
+                
+                // Final fallback
+                if (!bestMove) {
+                    const allMoves = getAllPossibleMoves(aiPlayer);
+                    if (allMoves.length > 0) {
+                        bestMove = allMoves[0];
+                    }
                 }
                 
                 if (bestMove) {
@@ -788,18 +742,78 @@
                     updateStatus();
                 }
                 document.getElementById('thinking').style.display = 'none';
-            }, 1200);
+            }, 800);
+        }
+
+        function findEmergencyMove(player) {
+            const moves = getAllPossibleMoves(player);
+            const enemyColor = player === 'white' ? 'black' : 'white';
+            
+            // First priority: If we're in check, find moves that get us out
+            if (isKingInCheck(board, player)) {
+                for (const move of moves) {
+                    const originalPiece = board[move.toRow][move.toCol];
+                    const movingPiece = board[move.fromRow][move.fromCol];
+                    board[move.toRow][move.toCol] = movingPiece;
+                    board[move.fromRow][move.fromCol] = '';
+                    
+                    if (!isKingInCheck(board, player)) {
+                        board[move.fromRow][move.fromCol] = movingPiece;
+                        board[move.toRow][move.toCol] = originalPiece;
+                        return move;
+                    }
+                    
+                    board[move.fromRow][move.fromCol] = movingPiece;
+                    board[move.toRow][move.toCol] = originalPiece;
+                }
+            }
+            
+            // Second priority: Look for checkmate in 1
+            for (const move of moves) {
+                const originalPiece = board[move.toRow][move.toCol];
+                const movingPiece = board[move.fromRow][move.fromCol];
+                board[move.toRow][move.toCol] = movingPiece;
+                board[move.fromRow][move.fromCol] = '';
+                
+                if (isKingInCheck(board, enemyColor)) {
+                    const enemyMoves = getAllPossibleMoves(enemyColor);
+                    if (enemyMoves.length === 0) {
+                        board[move.fromRow][move.fromCol] = movingPiece;
+                        board[move.toRow][move.toCol] = originalPiece;
+                        return move;
+                    }
+                }
+                
+                board[move.fromRow][move.fromCol] = movingPiece;
+                board[move.toRow][move.toCol] = originalPiece;
+            }
+            
+            // Third priority: Capture enemy queen if possible
+            const enemyQueen = enemyColor === 'white' ? '♕' : '♛';
+            for (const move of moves) {
+                if (board[move.toRow][move.toCol] === enemyQueen) {
+                    const originalPiece = board[move.toRow][move.toCol];
+                    const movingPiece = board[move.fromRow][move.fromCol];
+                    board[move.toRow][move.toCol] = movingPiece;
+                    board[move.fromRow][move.fromCol] = '';
+                    
+                    const safe = !isKingInCheck(board, player);
+                    
+                    board[move.fromRow][move.fromCol] = movingPiece;
+                    board[move.toRow][move.toCol] = originalPiece;
+                    
+                    if (safe) return move;
+                }
+            }
+            
+            return null;
         }
 
         function getOpeningMove(player) {
-            // Build current game state string
             const gameState = buildGameStateString();
             
-            // Check if current position is in opening book
             if (openingBook[gameState]) {
                 const possibleMoves = openingBook[gameState];
-                
-                // Select move based on weights
                 const totalWeight = possibleMoves.reduce((sum, move) => sum + move.weight, 0);
                 let random = Math.random() * totalWeight;
                 
@@ -811,31 +825,25 @@
                 }
             }
             
-            // If not in book, use basic opening principles
             return getBasicOpeningMove(player);
         }
 
         function buildGameStateString() {
-            // Simple representation of key moves played
-            // This is a simplified approach - in practice, you'd want more sophisticated position tracking
             return moveHistory.slice(0, Math.min(moveHistory.length, 6)).join(',');
         }
 
         function parseOpeningMove(moveStr, player) {
-            // Parse moves like "e2-e4" or "Ng1-f3"
             const parts = moveStr.split('-');
             if (parts.length !== 2) return null;
             
             const fromSquare = parts[0];
             const toSquare = parts[1];
             
-            // Convert algebraic notation to array indices
-            const fromCol = fromSquare.charCodeAt(fromSquare.length - 2) - 97; // 'a' = 0
+            const fromCol = fromSquare.charCodeAt(fromSquare.length - 2) - 97;
             const fromRow = 8 - parseInt(fromSquare.charAt(fromSquare.length - 1));
             const toCol = toSquare.charCodeAt(toSquare.length - 2) - 97;
             const toRow = 8 - parseInt(toSquare.charAt(toSquare.length - 1));
             
-            // Verify the move is legal
             if (isValidMove(fromRow, fromCol, toRow, toCol)) {
                 return { fromRow, fromCol, toRow, toCol };
             }
@@ -846,18 +854,14 @@
         function getBasicOpeningMove(player) {
             const moves = getAllPossibleMoves(player);
             
-            // Opening principles priority list
             const priorities = [
-                // 1. Control center with pawns
                 (move) => {
                     const piece = board[move.fromRow][move.fromCol];
                     if ((piece === '♟' || piece === '♙')) {
-                        // e4, d4, e5, d5
                         if ((move.toRow === 4 && (move.toCol === 4 || move.toCol === 3)) ||
                             (move.toRow === 3 && (move.toCol === 4 || move.toCol === 3))) {
                             return 100;
                         }
-                        // Other center pawns
                         if (move.toRow >= 2 && move.toRow <= 5 && move.toCol >= 2 && move.toCol <= 5) {
                             return 50;
                         }
@@ -865,16 +869,13 @@
                     return 0;
                 },
                 
-                // 2. Develop knights toward center
                 (move) => {
                     const piece = board[move.fromRow][move.fromCol];
                     if (piece === '♞' || piece === '♘') {
-                        // Knights to f3, c3, f6, c6
                         if ((move.toRow === 5 && (move.toCol === 5 || move.toCol === 2)) ||
                             (move.toRow === 2 && (move.toCol === 5 || move.toCol === 2))) {
                             return 80;
                         }
-                        // Other knight development
                         if (move.toRow >= 2 && move.toRow <= 5 && move.toCol >= 1 && move.toCol <= 6) {
                             return 60;
                         }
@@ -882,15 +883,13 @@
                     return 0;
                 },
                 
-                // 3. Develop bishops
                 (move) => {
                     const piece = board[move.fromRow][move.fromCol];
                     if (piece === '♝' || piece === '♗') {
-                        // Good bishop squares
-                        if ((move.toRow === 4 && move.toCol === 2) || // c4
-                            (move.toRow === 3 && move.toCol === 5) || // f5
-                            (move.toRow === 2 && move.toCol === 4) || // e6
-                            (move.toRow === 5 && move.toCol === 3)) { // d3
+                        if ((move.toRow === 4 && move.toCol === 2) ||
+                            (move.toRow === 3 && move.toCol === 5) ||
+                            (move.toRow === 2 && move.toCol === 4) ||
+                            (move.toRow === 5 && move.toCol === 3)) {
                             return 70;
                         }
                         return 40;
@@ -898,11 +897,9 @@
                     return 0;
                 },
                 
-                // 4. Castle early
                 (move) => {
                     const piece = board[move.fromRow][move.fromCol];
                     if (piece === '♚' || piece === '♔') {
-                        // Castling moves (simplified detection)
                         if (Math.abs(move.toCol - move.fromCol) === 2) {
                             return 90;
                         }
@@ -920,7 +917,6 @@
                     score += priority(move);
                 }
                 
-                // Add small random factor
                 score += Math.random() * 5;
                 
                 if (score > bestScore) {
@@ -929,16 +925,14 @@
                 }
             }
             
-            return bestMove || moves[0]; // Fallback to first legal move
+            return bestMove || moves[0];
         }
 
-        // Advanced AI using Minimax algorithm with Alpha-Beta pruning
         function getBestMoveMinMax(player, depth) {
             let bestScore = player === humanPlayer ? Infinity : -Infinity;
             let bestMove = null;
             const moves = getAllPossibleMoves(player);
             
-            // Sort moves to improve alpha-beta pruning efficiency
             moves.sort((a, b) => {
                 const scoreA = evaluateMoveQuick(a);
                 const scoreB = evaluateMoveQuick(b);
@@ -946,15 +940,14 @@
             });
             
             for (const move of moves) {
-                // Make the move
                 const originalPiece = board[move.toRow][move.toCol];
-                board[move.toRow][move.toCol] = board[move.fromRow][move.fromCol];
+                const movingPiece = board[move.fromRow][move.fromCol];
+                board[move.toRow][move.toCol] = movingPiece;
                 board[move.fromRow][move.fromCol] = '';
                 
                 const score = minimax(depth - 1, player === 'white' ? 'black' : 'white', -Infinity, Infinity, player !== humanPlayer);
                 
-                // Undo the move
-                board[move.fromRow][move.fromCol] = board[move.toRow][move.toCol];
+                board[move.fromRow][move.fromCol] = movingPiece;
                 board[move.toRow][move.toCol] = originalPiece;
                 
                 if ((player !== humanPlayer && score > bestScore) || (player === humanPlayer && score < bestScore)) {
@@ -976,7 +969,7 @@
                 if (isKingInCheck(board, player)) {
                     return maximizingPlayer ? -10000 + (aiDepth - depth) : 10000 - (aiDepth - depth);
                 }
-                return 0; // Stalemate
+                return 0;
             }
             
             if (maximizingPlayer) {
@@ -993,7 +986,7 @@
                     
                     maxEval = Math.max(maxEval, eval);
                     alpha = Math.max(alpha, eval);
-                    if (beta <= alpha) break; // Alpha-beta pruning
+                    if (beta <= alpha) break;
                 }
                 return maxEval;
             } else {
@@ -1010,7 +1003,7 @@
                     
                     minEval = Math.min(minEval, eval);
                     beta = Math.min(beta, eval);
-                    if (beta <= alpha) break; // Alpha-beta pruning
+                    if (beta <= alpha) break;
                 }
                 return minEval;
             }
@@ -1019,7 +1012,6 @@
         function evaluatePosition() {
             let score = 0;
             
-            // Material and positional evaluation
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     const piece = board[row][col];
@@ -1036,10 +1028,7 @@
                 }
             }
             
-            // Critical: Check for hanging pieces
             score += evaluateHangingPieces('white') - evaluateHangingPieces('black');
-            
-            // Advanced evaluations
             score += evaluateCenter();
             score += evaluateKingSafety('white') - evaluateKingSafety('black');
             score += evaluateDevelopment('white') - evaluateDevelopment('black');
@@ -1053,24 +1042,19 @@
             let hangingPenalty = 0;
             const enemy = player === 'white' ? 'black' : 'white';
             
-            // Check each piece to see if it's hanging (undefended and attacked)
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     const piece = board[row][col];
                     if (piece && isPlayerPiece(piece, player)) {
                         const pieceValue = getPieceValue(piece);
                         
-                        // Check if piece is attacked by enemy
                         const attackedBy = getAttackers(row, col, enemy);
                         if (attackedBy.length > 0) {
-                            // Check if piece is defended by friendly pieces
                             const defendedBy = getAttackers(row, col, player);
                             
                             if (defendedBy.length === 0) {
-                                // Piece is hanging (attacked but not defended)
-                                hangingPenalty -= pieceValue * 0.9; // Almost full piece value penalty
+                                hangingPenalty -= pieceValue * 0.9;
                             } else {
-                                // Piece is attacked and defended - evaluate exchange
                                 const exchangeValue = evaluateExchange(row, col, attackedBy, defendedBy);
                                 hangingPenalty += exchangeValue;
                             }
@@ -1089,9 +1073,8 @@
                 for (let col = 0; col < 8; col++) {
                     const piece = board[row][col];
                     if (piece && isPlayerPiece(piece, attackerColor)) {
-                        // Temporarily clear target square to test if piece can attack it
                         const originalPiece = board[targetRow][targetCol];
-                        board[targetRow][targetCol] = attackerColor === 'white' ? '♟' : '♙'; // Dummy enemy piece
+                        board[targetRow][targetCol] = attackerColor === 'white' ? '♟' : '♙';
                         
                         const tempCurrentPlayer = currentPlayer;
                         currentPlayer = attackerColor;
@@ -1120,36 +1103,30 @@
             const targetPiece = board[targetRow][targetCol];
             const targetValue = getPieceValue(targetPiece);
             
-            // Sort attackers and defenders by piece value (use least valuable first)
             attackers.sort((a, b) => a.value - b.value);
             defenders.sort((a, b) => a.value - b.value);
             
-            // Simulate the exchange sequence
             let materialBalance = 0;
             let attackerTurn = true;
             let attackerIndex = 0;
             let defenderIndex = 0;
             let currentTargetValue = targetValue;
             
-            // First capture
             if (attackers.length > 0) {
-                materialBalance += currentTargetValue; // Attacker gains target
+                materialBalance += currentTargetValue;
                 currentTargetValue = attackers[attackerIndex].value;
                 attackerIndex++;
                 attackerTurn = false;
             }
             
-            // Continue exchange sequence
             while ((attackerTurn && attackerIndex < attackers.length) || 
                    (!attackerTurn && defenderIndex < defenders.length)) {
                 
                 if (attackerTurn) {
-                    // Attacker recaptures
                     materialBalance += currentTargetValue;
                     currentTargetValue = attackers[attackerIndex].value;
                     attackerIndex++;
                 } else {
-                    // Defender recaptures
                     materialBalance -= currentTargetValue;
                     currentTargetValue = defenders[defenderIndex].value;
                     defenderIndex++;
@@ -1161,56 +1138,19 @@
             return materialBalance;
         }
 
-        function getBestMoveMinMax(player, depth) {
-            let bestScore = player === humanPlayer ? Infinity : -Infinity;
-            let bestMove = null;
-            const moves = getAllPossibleMoves(player);
-            
-            // Sort moves to improve alpha-beta pruning efficiency
-            moves.sort((a, b) => {
-                const scoreA = evaluateMoveQuick(a);
-                const scoreB = evaluateMoveQuick(b);
-                return player === humanPlayer ? scoreA - scoreB : scoreB - scoreA;
-            });
-            
-            for (const move of moves) {
-                // Make the move
-                const originalPiece = board[move.toRow][move.toCol];
-                const movingPiece = board[move.fromRow][move.fromCol];
-                board[move.toRow][move.toCol] = movingPiece;
-                board[move.fromRow][move.fromCol] = '';
-                
-                const score = minimax(depth - 1, player === 'white' ? 'black' : 'white', -Infinity, Infinity, player !== humanPlayer);
-                
-                // Undo the move
-                board[move.fromRow][move.fromCol] = movingPiece;
-                board[move.toRow][move.toCol] = originalPiece;
-                
-                if ((player !== humanPlayer && score > bestScore) || (player === humanPlayer && score < bestScore)) {
-                    bestScore = score;
-                    bestMove = move;
-                }
-            }
-            
-            return bestMove;
-        }
-
         function evaluateMoveQuick(move) {
             let score = 0;
             const movingPiece = board[move.fromRow][move.fromCol];
             const targetPiece = board[move.toRow][move.toCol];
             
-            // Capture value
             if (targetPiece) {
                 score += getPieceValue(targetPiece);
             }
             
-            // Check if moving piece becomes hanging after this move
             const originalTarget = board[move.toRow][move.toCol];
             board[move.toRow][move.toCol] = movingPiece;
             board[move.fromRow][move.fromCol] = '';
             
-            // Check if the moved piece is now hanging
             const playerColor = isPlayerPiece(movingPiece, 'white') ? 'white' : 'black';
             const enemyColor = playerColor === 'white' ? 'black' : 'white';
             
@@ -1218,10 +1158,8 @@
             const defenders = getAttackers(move.toRow, move.toCol, playerColor);
             
             if (attackers.length > 0 && defenders.length === 0) {
-                // Piece becomes hanging
                 score -= getPieceValue(movingPiece) * 0.8;
             } else if (attackers.length > 0) {
-                // Evaluate potential exchange
                 const exchangeValue = evaluateExchange(move.toRow, move.toCol, attackers, defenders);
                 if (playerColor === 'white') {
                     score += exchangeValue;
@@ -1230,22 +1168,19 @@
                 }
             }
             
-            // Restore board
             board[move.fromRow][move.fromCol] = movingPiece;
             board[move.toRow][move.toCol] = originalTarget;
             
-            // Prefer center moves
             const centerDistance = Math.abs(move.toRow - 3.5) + Math.abs(move.toCol - 3.5);
             score -= centerDistance * 2;
             
-            // Bonus for developing pieces
             if (moveCount < 10) {
                 const pieceType = movingPiece.toLowerCase();
                 if ((pieceType === '♞' || pieceType === '♘' || 
                      pieceType === '♝' || pieceType === '♗') &&
                     ((isPlayerPiece(movingPiece, 'white') && move.fromRow === 7) ||
                      (isPlayerPiece(movingPiece, 'black') && move.fromRow === 0))) {
-                    score += 15; // Development bonus
+                    score += 15;
                 }
             }
             
@@ -1259,19 +1194,17 @@
             
             if (!isEarlyGame) return 0;
             
-            // Penalty for pieces still on back rank
             for (let col = 0; col < 8; col++) {
                 const piece = board[backRank][col];
                 if (piece && isPlayerPiece(piece, player)) {
                     const pieceType = piece.toLowerCase();
                     if (pieceType === '♞' || pieceType === '♘' || 
                         pieceType === '♝' || pieceType === '♗') {
-                        development -= 15; // Penalty for undeveloped pieces
+                        development -= 15;
                     }
                 }
             }
             
-            // Bonus for developed pieces
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     const piece = board[row][col];
@@ -1294,7 +1227,6 @@
 
         function evaluatePawnStructure(player) {
             let score = 0;
-            const direction = player === 'white' ? -1 : 1;
             const pawn = player === 'white' ? '♙' : '♟';
             
             for (let col = 0; col < 8; col++) {
@@ -1304,7 +1236,6 @@
                 for (let row = 0; row < 8; row++) {
                     if (board[row][col] === pawn) {
                         pawnCount++;
-                        // Bonus for advanced pawns
                         const advancement = player === 'white' ? (7 - row) : row;
                         if (advancement > 4) {
                             score += advancement * 5;
@@ -1313,17 +1244,14 @@
                     }
                 }
                 
-                // Penalty for doubled pawns
                 if (pawnCount > 1) {
                     score -= 10 * (pawnCount - 1);
                 }
                 
-                // Bonus for passed pawns (simplified check)
                 if (pawnCount === 1 && advanced) {
                     let passed = true;
                     const enemyPawn = player === 'white' ? '♟' : '♙';
                     
-                    // Check adjacent files for enemy pawns
                     for (let checkCol = Math.max(0, col - 1); checkCol <= Math.min(7, col + 1); checkCol++) {
                         for (let row = 0; row < 8; row++) {
                             if (board[row][checkCol] === enemyPawn) {
@@ -1350,17 +1278,15 @@
             let threats = 0;
             const enemy = player === 'white' ? 'black' : 'white';
             
-            // Check for checkmate threats (simplified)
             if (isKingInCheck(board, enemy)) {
                 const enemyMoves = getAllPossibleMoves(enemy);
                 if (enemyMoves.length === 0) {
-                    return 10000; // Checkmate
+                    return 10000;
                 } else if (enemyMoves.length < 3) {
-                    threats += 100; // Severe pressure
+                    threats += 100;
                 }
             }
             
-            // Look for tactics: forks, pins, skewers (basic detection)
             for (let fromRow = 0; fromRow < 8; fromRow++) {
                 for (let fromCol = 0; fromCol < 8; fromCol++) {
                     const piece = board[fromRow][fromCol];
@@ -1377,18 +1303,15 @@
             let threats = 0;
             const pieceType = piece.toLowerCase();
             
-            // Check all possible moves for this piece
             for (let toRow = 0; toRow < 8; toRow++) {
                 for (let toCol = 0; toCol < 8; toCol++) {
                     if (isValidMove(fromRow, fromCol, toRow, toCol)) {
                         const targetPiece = board[toRow][toCol];
                         
-                        // Direct capture threat
                         if (targetPiece && isPlayerPiece(targetPiece, enemyColor)) {
                             threats += getPieceValue(targetPiece) / 10;
                         }
                         
-                        // Fork detection (simplified)
                         if (pieceType === '♞' || pieceType === '♘' || 
                             pieceType === '♟' || pieceType === '♙') {
                             let attackCount = 0;
@@ -1406,7 +1329,7 @@
                             }
                             
                             if (attackCount >= 2) {
-                                threats += 30; // Fork bonus
+                                threats += 30;
                             }
                         }
                     }
@@ -1513,8 +1436,6 @@
             if (kingRow === -1) return -1000;
             
             let safety = 0;
-            
-            // Penalty for exposed king
             const directions = [[-1,-1], [-1,0], [-1,1], [0,-1], [0,1], [1,-1], [1,0], [1,1]];
             for (const [dr, dc] of directions) {
                 const newRow = kingRow + dr;
@@ -1522,69 +1443,12 @@
                 if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
                     const piece = board[newRow][newCol];
                     if (piece && isPlayerPiece(piece, player)) {
-                        safety += 5; // Friendly piece nearby
+                        safety += 5;
                     }
                 }
             }
             
             return safety;
-        }
-
-        function evaluateMoveQuick(move) {
-            let score = 0;
-            const movingPiece = board[move.fromRow][move.fromCol];
-            const targetPiece = board[move.toRow][move.toCol];
-            
-            // Capture value
-            if (targetPiece) {
-                score += getPieceValue(targetPiece);
-            }
-            
-            // Check if moving piece becomes hanging after this move
-            const originalTarget = board[move.toRow][move.toCol];
-            board[move.toRow][move.toCol] = movingPiece;
-            board[move.fromRow][move.fromCol] = '';
-            
-            // Check if the moved piece is now hanging
-            const playerColor = isPlayerPiece(movingPiece, 'white') ? 'white' : 'black';
-            const enemyColor = playerColor === 'white' ? 'black' : 'white';
-            
-            const attackers = getAttackers(move.toRow, move.toCol, enemyColor);
-            const defenders = getAttackers(move.toRow, move.toCol, playerColor);
-            
-            if (attackers.length > 0 && defenders.length === 0) {
-                // Piece becomes hanging
-                score -= getPieceValue(movingPiece) * 0.8;
-            } else if (attackers.length > 0) {
-                // Evaluate potential exchange
-                const exchangeValue = evaluateExchange(move.toRow, move.toCol, attackers, defenders);
-                if (playerColor === 'white') {
-                    score += exchangeValue;
-                } else {
-                    score -= exchangeValue;
-                }
-            }
-            
-            // Restore board
-            board[move.fromRow][move.fromCol] = movingPiece;
-            board[move.toRow][move.toCol] = originalTarget;
-            
-            // Prefer center moves
-            const centerDistance = Math.abs(move.toRow - 3.5) + Math.abs(move.toCol - 3.5);
-            score -= centerDistance * 2;
-            
-            // Bonus for developing pieces
-            if (moveCount < 10) {
-                const pieceType = movingPiece.toLowerCase();
-                if ((pieceType === '♞' || pieceType === '♘' || 
-                     pieceType === '♝' || pieceType === '♗') &&
-                    ((isPlayerPiece(movingPiece, 'white') && move.fromRow === 7) ||
-                     (isPlayerPiece(movingPiece, 'black') && move.fromRow === 0))) {
-                    score += 15; // Development bonus
-                }
-            }
-            
-            return score;
         }
 
         function getPieceValue(piece) {
@@ -1672,7 +1536,6 @@
             moveCount = 0;
             gameOver = false;
             
-            // Reset castling rights
             castlingRights = {
                 whiteKingside: true,
                 whiteQueenside: true,
@@ -1680,7 +1543,6 @@
                 blackQueenside: true
             };
             
-            // Reset en passant
             enPassantTarget = null;
             
             document.getElementById('current-player').textContent = 'White';
@@ -1689,7 +1551,6 @@
             updateStatus();
             updateMoveHistory();
             
-            // If AI plays first, make AI move
             if (currentPlayer !== humanPlayer) {
                 setTimeout(makeAIMove, 1000);
             }
@@ -1701,7 +1562,6 @@
             
             clearSelection();
             
-            // If it's now AI's turn, make AI move
             if (!gameOver && currentPlayer !== humanPlayer) {
                 setTimeout(makeAIMove, 500);
             }
@@ -1709,13 +1569,15 @@
 
         function undoMove() {
             if (gameHistory.length >= 2) {
-                gameHistory.pop(); // Remove current state
-                const lastState = gameHistory.pop(); // Get previous state
+                gameHistory.pop();
+                const lastState = gameHistory.pop();
                 
                 board = lastState.board;
                 currentPlayer = lastState.currentPlayer;
                 moveHistory = lastState.moveHistory;
                 moveCount = lastState.moveCount;
+                castlingRights = lastState.castlingRights;
+                enPassantTarget = lastState.enPassantTarget;
                 gameOver = false;
                 
                 document.getElementById('current-player').textContent = currentPlayer === 'white' ? 'White' : 'Black';
@@ -1727,381 +1589,11 @@
                 newGame();
             }
         }
-        function makeAIMove() {
-            if (gameOver) return;
-            
-            document.getElementById('thinking').style.display = 'block';
-            
-            setTimeout(() => {
-                const aiPlayer = humanPlayer === 'white' ? 'black' : 'white';
-                let bestMove = null;
-                
-                // Use opening book for first 5 moves only (reduced)
-                if (moveCount <= 3) {
-                    try {
-                        bestMove = getOpeningMove(aiPlayer);
-                    } catch (e) {
-                        console.log("Opening book failed, using minimax");
-                        bestMove = null;
-                    }
-                }
-                
-                // If no opening move found, use minimax with timeout protection
-                if (!bestMove) {
-                    try {
-                        bestMove = getBestMoveMinMax(aiPlayer, Math.min(aiDepth, 3)); // Reduced depth
-                    } catch (e) {
-                        console.log("Minimax failed, using random move");
-                        const allMoves = getAllPossibleMoves(aiPlayer);
-                        if (allMoves.length > 0) {
-                            bestMove = allMoves[Math.floor(Math.random() * allMoves.length)];
-                        }
-                    }
-                }
-                
-                // Final fallback - just pick any legal move
-                if (!bestMove) {
-                    const allMoves = getAllPossibleMoves(aiPlayer);
-                    if (allMoves.length > 0) {
-                        bestMove = allMoves[0];
-                    }
-                }
-                
-                if (bestMove) {
-                    makeMove(bestMove.fromRow, bestMove.fromCol, bestMove.toRow, bestMove.toCol);
-                    switchPlayer();
-                    updateStatus();
-                }
-                document.getElementById('thinking').style.display = 'none';
-            }, 800); // Reduced thinking time
-        }
+
         // Initialize the game
         createBoard();
         updateStatus();
         document.getElementById('player-side').textContent = 'White';
-        // New function focused on immediate capture opportunities
-        function evaluateImmediateThreats(player) {
-            let threats = 0;
-            const enemy = player === 'white' ? 'black' : 'white';
-            
-            // Look for pieces we can capture next move
-            for (let fromRow = 0; fromRow < 8; fromRow++) {
-                for (let fromCol = 0; fromCol < 8; fromCol++) {
-                    const piece = board[fromRow][fromCol];
-                    if (piece && isPlayerPiece(piece, player)) {
-                        
-                        // Check all squares this piece can attack
-                        for (let toRow = 0; toRow < 8; toRow++) {
-                            for (let toCol = 0; toCol < 8; toCol++) {
-                                const targetPiece = board[toRow][toCol];
-                                
-                                if (targetPiece && isPlayerPiece(targetPiece, enemy)) {
-                                    const tempCurrentPlayer = currentPlayer;
-                                    currentPlayer = player;
-                                    
-                                    if (isValidMove(fromRow, fromCol, toRow, toCol)) {
-                                        const captureValue = getPieceValue(targetPiece);
-                                        
-                                        // Check if it's a safe capture
-                                        board[toRow][toCol] = piece;
-                                        board[fromRow][fromCol] = '';
-                                        
-                                        const attackers = getAttackers(toRow, toCol, enemy);
-                                        
-                                        if (attackers.length === 0) {
-                                            // Safe capture - big bonus!
-                                            threats += captureValue * 0.8;
-                                        } else {
-                                            // Risky capture - smaller bonus
-                                            threats += captureValue * 0.3;
-                                        }
-                                        
-                                        // Restore board
-                                        board[fromRow][fromCol] = piece;
-                                        board[toRow][toCol] = targetPiece;
-                                    }
-                                    
-                                    currentPlayer = tempCurrentPlayer;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            return threats;
-        }        function makeAIMove() {
-            if (gameOver) return;
-            
-            document.getElementById('thinking').style.display = 'block';
-            
-            setTimeout(() => {
-                const aiPlayer = humanPlayer === 'white' ? 'black' : 'white';
-                let bestMove = null;
-                
-                // Use opening book for first 5 moves only (reduced)
-                if (moveCount <= 3) {
-                    try {
-                        bestMove = getOpeningMove(aiPlayer);
-                    } catch (e) {
-                        console.log("Opening book failed, using minimax");
-                        bestMove = null;
-                    }
-                }
-                
-                // If no opening move found, use minimax with timeout protection
-                if (!bestMove) {
-                    try {
-                        bestMove = getBestMoveMinMax(aiPlayer, Math.min(aiDepth, 3)); // Reduced depth
-                    } catch (e) {
-                        console.log("Minimax failed, using random move");
-                        const allMoves = getAllPossibleMoves(aiPlayer);
-                        if (allMoves.length > 0) {
-                            bestMove = allMoves[Math.floor(Math.random() * allMoves.length)];
-                        }
-                    }
-                }
-                
-                // Final fallback - just pick any legal move
-                if (!bestMove) {
-                    const allMoves = getAllPossibleMoves(aiPlayer);
-                    if (allMoves.length > 0) {
-                        bestMove = allMoves[0];
-                    }
-                }
-                
-                if (bestMove) {
-                    makeMove(bestMove.fromRow, bestMove.fromCol, bestMove.toRow, bestMove.toCol);
-                    switchPlayer();
-                    updateStatus();
-                }
-                document.getElementById('thinking').style.display = 'none';
-            }, 800); // Reduced thinking time
-        }
-        // Emergency move finder - handles immediate threats
-        function findEmergencyMove(player) {
-            const moves = getAllPossibleMoves(player);
-            const enemyColor = player === 'white' ? 'black' : 'white';
-            
-            // First priority: If we're in check, find moves that get us out
-            if (isKingInCheck(board, player)) {
-                for (const move of moves) {
-                    const originalPiece = board[move.toRow][move.toCol];
-                    const movingPiece = board[move.fromRow][move.fromCol];
-                    board[move.toRow][move.toCol] = movingPiece;
-                    board[move.fromRow][move.fromCol] = '';
-                    
-                    if (!isKingInCheck(board, player)) {
-                        // This move gets us out of check
-                        board[move.fromRow][move.fromCol] = movingPiece;
-                        board[move.toRow][move.toCol] = originalPiece;
-                        return move;
-                    }
-                    
-                    board[move.fromRow][move.fromCol] = movingPiece;
-                    board[move.toRow][move.toCol] = originalPiece;
-                }
-            }
-            
-            // Second priority: Look for checkmate in 1
-            for (const move of moves) {
-                const originalPiece = board[move.toRow][move.toCol];
-                const movingPiece = board[move.fromRow][move.fromCol];
-                board[move.toRow][move.toCol] = movingPiece;
-                board[move.fromRow][move.fromCol] = '';
-                
-                if (isKingInCheck(board, enemyColor)) {
-                    const enemyMoves = getAllPossibleMoves(enemyColor);
-                    if (enemyMoves.length === 0) {
-                        // This is checkmate!
-                        board[move.fromRow][move.fromCol] = movingPiece;
-                        board[move.toRow][move.toCol] = originalPiece;
-                        return move;
-                    }
-                }
-                
-                board[move.fromRow][move.fromCol] = movingPiece;
-                board[move.toRow][move.toCol] = originalPiece;
-            }
-            
-            // Third priority: Capture enemy queen if possible
-            const enemyQueen = enemyColor === 'white' ? '♕' : '♛';
-            for (const move of moves) {
-                if (board[move.toRow][move.toCol] === enemyQueen) {
-                    // Make sure it's a legal capture
-                    const originalPiece = board[move.toRow][move.toCol];
-                    const movingPiece = board[move.fromRow][move.fromCol];
-                    board[move.toRow][move.toCol] = movingPiece;
-                    board[move.fromRow][move.fromCol] = '';
-                    
-                    const safe = !isKingInCheck(board, player);
-                    
-                    board[move.fromRow][move.fromCol] = movingPiece;
-                    board[move.toRow][move.toCol] = originalPiece;
-                    
-                    if (safe) return move;
-                }
-            }
-            
-            return null; // No emergency move needed
-        }        // Critical safety functions to prevent basic blunders
-        function canEnemyCheckmateNext(enemyColor) {
-            const enemyMoves = getAllPossibleMoves(enemyColor);
-            
-            for (const move of enemyMoves) {
-                // Try the enemy move
-                const originalPiece = board[move.toRow][move.toCol];
-                const movingPiece = board[move.fromRow][move.fromCol];
-                board[move.toRow][move.toCol] = movingPiece;
-                board[move.fromRow][move.fromCol] = '';
-                
-                // Check if this puts us in checkmate
-                const ourColor = enemyColor === 'white' ? 'black' : 'white';
-                if (isKingInCheck(board, ourColor)) {
-                    const ourMoves = getAllPossibleMoves(ourColor);
-                    if (ourMoves.length === 0) {
-                        // This is checkmate!
-                        board[move.fromRow][move.fromCol] = movingPiece;
-                        board[move.toRow][move.toCol] = originalPiece;
-                        return true;
-                    }
-                }
-                
-                // Undo the move
-                board[move.fromRow][move.fromCol] = movingPiece;
-                board[move.toRow][move.toCol] = originalPiece;
-            }
-            
-            return false;
-        }
-
-        function canEnemyCaptureQueen(enemyColor) {
-            const ourColor = enemyColor === 'white' ? 'black' : 'white';
-            const ourQueen = ourColor === 'white' ? '♕' : '♛';
-            
-            // Find our queen
-            let queenRow = -1, queenCol = -1;
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    if (board[row][col] === ourQueen) {
-                        queenRow = row;
-                        queenCol = col;
-                        break;
-                    }
-                }
-                if (queenRow !== -1) break;
-            }
-            
-            if (queenRow === -1) return false; // No queen to capture
-            
-            // Check if enemy can capture our queen
-            const enemyMoves = getAllPossibleMoves(enemyColor);
-            for (const move of enemyMoves) {
-                if (move.toRow === queenRow && move.toCol === queenCol) {
-                    return true;
-                }
-            }
-            
-            return false;
-        }        // New function focused on immediate capture opportunities
-        function evaluateImmediateThreats(player) {
-            let threats = 0;
-            const enemy = player === 'white' ? 'black' : 'white';
-            
-            // Look for pieces we can capture next move
-            for (let fromRow = 0; fromRow < 8; fromRow++) {
-                for (let fromCol = 0; fromCol < 8; fromCol++) {
-                    const piece = board[fromRow][fromCol];
-                    if (piece && isPlayerPiece(piece, player)) {
-                        
-                        // Check all squares this piece can attack
-                        for (let toRow = 0; toRow < 8; toRow++) {
-                            for (let toCol = 0; toCol < 8; toCol++) {
-                                const targetPiece = board[toRow][toCol];
-                                
-                                if (targetPiece && isPlayerPiece(targetPiece, enemy)) {
-                                    const tempCurrentPlayer = currentPlayer;
-                                    currentPlayer = player;
-                                    
-                                    if (isValidMove(fromRow, fromCol, toRow, toCol)) {
-                                        const captureValue = getPieceValue(targetPiece);
-                                        
-                                        // Check if it's a safe capture
-                                        board[toRow][toCol] = piece;
-                                        board[fromRow][fromCol] = '';
-                                        
-                                        const attackers = getAttackers(toRow, toCol, enemy);
-                                        
-                                        if (attackers.length === 0) {
-                                            // Safe capture - big bonus!
-                                            threats += captureValue * 0.8;
-                                        } else {
-                                            // Risky capture - smaller bonus
-                                            threats += captureValue * 0.3;
-                                        }
-                                        
-                                        // Restore board
-                                        board[fromRow][fromCol] = piece;
-                                        board[toRow][toCol] = targetPiece;
-                                    }
-                                    
-                                    currentPlayer = tempCurrentPlayer;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            return threats;
-        }        function makeAIMove() {
-            if (gameOver) return;
-            
-            document.getElementById('thinking').style.display = 'block';
-            
-            setTimeout(() => {
-                const aiPlayer = humanPlayer === 'white' ? 'black' : 'white';
-                let bestMove = null;
-                
-                // Use opening book for first 5 moves only (reduced)
-                if (moveCount <= 3) {
-                    try {
-                        bestMove = getOpeningMove(aiPlayer);
-                    } catch (e) {
-                        console.log("Opening book failed, using minimax");
-                        bestMove = null;
-                    }
-                }
-                
-                // If no opening move found, use minimax with timeout protection
-                if (!bestMove) {
-                    try {
-                        bestMove = getBestMoveMinMax(aiPlayer, Math.min(aiDepth, 3)); // Reduced depth
-                    } catch (e) {
-                        console.log("Minimax failed, using random move");
-                        const allMoves = getAllPossibleMoves(aiPlayer);
-                        if (allMoves.length > 0) {
-                            bestMove = allMoves[Math.floor(Math.random() * allMoves.length)];
-                        }
-                    }
-                }
-                
-                // Final fallback - just pick any legal move
-                if (!bestMove) {
-                    const allMoves = getAllPossibleMoves(aiPlayer);
-                    if (allMoves.length > 0) {
-                        bestMove = allMoves[0];
-                    }
-                }
-                
-                if (bestMove) {
-                    makeMove(bestMove.fromRow, bestMove.fromCol, bestMove.toRow, bestMove.toCol);
-                    switchPlayer();
-                    updateStatus();
-                }
-                document.getElementById('thinking').style.display = 'none';
-            }, 800); // Reduced thinking time
-        }
     </script>
 </body>
 </html>
