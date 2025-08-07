@@ -1878,6 +1878,230 @@
                 document.getElementById('thinking').style.display = 'none';
             }, 800); // Reduced thinking time
         }
+        // Emergency move finder - handles immediate threats
+        function findEmergencyMove(player) {
+            const moves = getAllPossibleMoves(player);
+            const enemyColor = player === 'white' ? 'black' : 'white';
+            
+            // First priority: If we're in check, find moves that get us out
+            if (isKingInCheck(board, player)) {
+                for (const move of moves) {
+                    const originalPiece = board[move.toRow][move.toCol];
+                    const movingPiece = board[move.fromRow][move.fromCol];
+                    board[move.toRow][move.toCol] = movingPiece;
+                    board[move.fromRow][move.fromCol] = '';
+                    
+                    if (!isKingInCheck(board, player)) {
+                        // This move gets us out of check
+                        board[move.fromRow][move.fromCol] = movingPiece;
+                        board[move.toRow][move.toCol] = originalPiece;
+                        return move;
+                    }
+                    
+                    board[move.fromRow][move.fromCol] = movingPiece;
+                    board[move.toRow][move.toCol] = originalPiece;
+                }
+            }
+            
+            // Second priority: Look for checkmate in 1
+            for (const move of moves) {
+                const originalPiece = board[move.toRow][move.toCol];
+                const movingPiece = board[move.fromRow][move.fromCol];
+                board[move.toRow][move.toCol] = movingPiece;
+                board[move.fromRow][move.fromCol] = '';
+                
+                if (isKingInCheck(board, enemyColor)) {
+                    const enemyMoves = getAllPossibleMoves(enemyColor);
+                    if (enemyMoves.length === 0) {
+                        // This is checkmate!
+                        board[move.fromRow][move.fromCol] = movingPiece;
+                        board[move.toRow][move.toCol] = originalPiece;
+                        return move;
+                    }
+                }
+                
+                board[move.fromRow][move.fromCol] = movingPiece;
+                board[move.toRow][move.toCol] = originalPiece;
+            }
+            
+            // Third priority: Capture enemy queen if possible
+            const enemyQueen = enemyColor === 'white' ? '♕' : '♛';
+            for (const move of moves) {
+                if (board[move.toRow][move.toCol] === enemyQueen) {
+                    // Make sure it's a legal capture
+                    const originalPiece = board[move.toRow][move.toCol];
+                    const movingPiece = board[move.fromRow][move.fromCol];
+                    board[move.toRow][move.toCol] = movingPiece;
+                    board[move.fromRow][move.fromCol] = '';
+                    
+                    const safe = !isKingInCheck(board, player);
+                    
+                    board[move.fromRow][move.fromCol] = movingPiece;
+                    board[move.toRow][move.toCol] = originalPiece;
+                    
+                    if (safe) return move;
+                }
+            }
+            
+            return null; // No emergency move needed
+        }        // Critical safety functions to prevent basic blunders
+        function canEnemyCheckmateNext(enemyColor) {
+            const enemyMoves = getAllPossibleMoves(enemyColor);
+            
+            for (const move of enemyMoves) {
+                // Try the enemy move
+                const originalPiece = board[move.toRow][move.toCol];
+                const movingPiece = board[move.fromRow][move.fromCol];
+                board[move.toRow][move.toCol] = movingPiece;
+                board[move.fromRow][move.fromCol] = '';
+                
+                // Check if this puts us in checkmate
+                const ourColor = enemyColor === 'white' ? 'black' : 'white';
+                if (isKingInCheck(board, ourColor)) {
+                    const ourMoves = getAllPossibleMoves(ourColor);
+                    if (ourMoves.length === 0) {
+                        // This is checkmate!
+                        board[move.fromRow][move.fromCol] = movingPiece;
+                        board[move.toRow][move.toCol] = originalPiece;
+                        return true;
+                    }
+                }
+                
+                // Undo the move
+                board[move.fromRow][move.fromCol] = movingPiece;
+                board[move.toRow][move.toCol] = originalPiece;
+            }
+            
+            return false;
+        }
+
+        function canEnemyCaptureQueen(enemyColor) {
+            const ourColor = enemyColor === 'white' ? 'black' : 'white';
+            const ourQueen = ourColor === 'white' ? '♕' : '♛';
+            
+            // Find our queen
+            let queenRow = -1, queenCol = -1;
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if (board[row][col] === ourQueen) {
+                        queenRow = row;
+                        queenCol = col;
+                        break;
+                    }
+                }
+                if (queenRow !== -1) break;
+            }
+            
+            if (queenRow === -1) return false; // No queen to capture
+            
+            // Check if enemy can capture our queen
+            const enemyMoves = getAllPossibleMoves(enemyColor);
+            for (const move of enemyMoves) {
+                if (move.toRow === queenRow && move.toCol === queenCol) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }        // New function focused on immediate capture opportunities
+        function evaluateImmediateThreats(player) {
+            let threats = 0;
+            const enemy = player === 'white' ? 'black' : 'white';
+            
+            // Look for pieces we can capture next move
+            for (let fromRow = 0; fromRow < 8; fromRow++) {
+                for (let fromCol = 0; fromCol < 8; fromCol++) {
+                    const piece = board[fromRow][fromCol];
+                    if (piece && isPlayerPiece(piece, player)) {
+                        
+                        // Check all squares this piece can attack
+                        for (let toRow = 0; toRow < 8; toRow++) {
+                            for (let toCol = 0; toCol < 8; toCol++) {
+                                const targetPiece = board[toRow][toCol];
+                                
+                                if (targetPiece && isPlayerPiece(targetPiece, enemy)) {
+                                    const tempCurrentPlayer = currentPlayer;
+                                    currentPlayer = player;
+                                    
+                                    if (isValidMove(fromRow, fromCol, toRow, toCol)) {
+                                        const captureValue = getPieceValue(targetPiece);
+                                        
+                                        // Check if it's a safe capture
+                                        board[toRow][toCol] = piece;
+                                        board[fromRow][fromCol] = '';
+                                        
+                                        const attackers = getAttackers(toRow, toCol, enemy);
+                                        
+                                        if (attackers.length === 0) {
+                                            // Safe capture - big bonus!
+                                            threats += captureValue * 0.8;
+                                        } else {
+                                            // Risky capture - smaller bonus
+                                            threats += captureValue * 0.3;
+                                        }
+                                        
+                                        // Restore board
+                                        board[fromRow][fromCol] = piece;
+                                        board[toRow][toCol] = targetPiece;
+                                    }
+                                    
+                                    currentPlayer = tempCurrentPlayer;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return threats;
+        }        function makeAIMove() {
+            if (gameOver) return;
+            
+            document.getElementById('thinking').style.display = 'block';
+            
+            setTimeout(() => {
+                const aiPlayer = humanPlayer === 'white' ? 'black' : 'white';
+                let bestMove = null;
+                
+                // Use opening book for first 5 moves only (reduced)
+                if (moveCount <= 3) {
+                    try {
+                        bestMove = getOpeningMove(aiPlayer);
+                    } catch (e) {
+                        console.log("Opening book failed, using minimax");
+                        bestMove = null;
+                    }
+                }
+                
+                // If no opening move found, use minimax with timeout protection
+                if (!bestMove) {
+                    try {
+                        bestMove = getBestMoveMinMax(aiPlayer, Math.min(aiDepth, 3)); // Reduced depth
+                    } catch (e) {
+                        console.log("Minimax failed, using random move");
+                        const allMoves = getAllPossibleMoves(aiPlayer);
+                        if (allMoves.length > 0) {
+                            bestMove = allMoves[Math.floor(Math.random() * allMoves.length)];
+                        }
+                    }
+                }
+                
+                // Final fallback - just pick any legal move
+                if (!bestMove) {
+                    const allMoves = getAllPossibleMoves(aiPlayer);
+                    if (allMoves.length > 0) {
+                        bestMove = allMoves[0];
+                    }
+                }
+                
+                if (bestMove) {
+                    makeMove(bestMove.fromRow, bestMove.fromCol, bestMove.toRow, bestMove.toCol);
+                    switchPlayer();
+                    updateStatus();
+                }
+                document.getElementById('thinking').style.display = 'none';
+            }, 800); // Reduced thinking time
+        }
     </script>
 </body>
 </html>
