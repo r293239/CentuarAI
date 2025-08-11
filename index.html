@@ -82,6 +82,10 @@
             background-color: #90EE90 !important;
         }
 
+        .capture-move {
+            background-color: #FFD700 !important;
+        }
+
         .last-move {
             background-color: #FFE4B5 !important;
         }
@@ -257,7 +261,6 @@
             blackQueenside: true
         };
         
-        let enPassantTarget = null;
         let repetitionHistory = new Map();
 
         // Performance tracking
@@ -410,7 +413,7 @@
         function clearSelection() {
             selectedSquare = null;
             document.querySelectorAll('.square').forEach(sq => {
-                sq.classList.remove('selected', 'possible-move');
+                sq.classList.remove('selected', 'possible-move', 'capture-move');
             });
             createBoard();
         }
@@ -420,7 +423,12 @@
                 for (let c = 0; c < 8; c++) {
                     if (isValidMove(row, col, r, c)) {
                         const square = document.getElementById(`square-${r}-${c}`);
-                        square.classList.add('possible-move');
+                        // Yellow highlight for captures, green for regular moves
+                        if (board[r][c] && isPlayerPiece(board[r][c], currentPlayer === 'white' ? 'black' : 'white')) {
+                            square.classList.add('capture-move');
+                        } else {
+                            square.classList.add('possible-move');
+                        }
                     }
                 }
             }
@@ -452,13 +460,6 @@
                 return canCastle(fromRow, fromCol, toRow, toCol);
             }
             
-            // En passant check
-            if ((piece === '♙' || piece === '♟') && Math.abs(toCol - fromCol) === 1 && !targetPiece && enPassantTarget) {
-                if (toRow === enPassantTarget.row && toCol === enPassantTarget.col) {
-                    return true;
-                }
-            }
-            
             const pieceCode = pieceMap[piece];
             if (!isValidPieceMove(pieceCode, fromRow, fromCol, toRow, toCol)) return false;
             
@@ -470,14 +471,6 @@
             const piece = board[fromRow][fromCol];
             const originalTarget = board[toRow][toCol];
             
-            // Handle en passant capture
-            let capturedPawnRow = null;
-            if ((piece === '♙' || piece === '♟') && enPassantTarget && 
-                toRow === enPassantTarget.row && toCol === enPassantTarget.col) {
-                capturedPawnRow = piece === '♙' ? toRow + 1 : toRow - 1;
-                board[capturedPawnRow][toCol] = '';
-            }
-            
             // Make temporary move
             board[toRow][toCol] = piece;
             board[fromRow][fromCol] = '';
@@ -487,11 +480,6 @@
             // Restore board
             board[fromRow][fromCol] = piece;
             board[toRow][toCol] = originalTarget;
-            
-            if (capturedPawnRow !== null) {
-                const capturedPawn = piece === '♙' ? '♟' : '♙';
-                board[capturedPawnRow][toCol] = capturedPawn;
-            }
             
             return inCheck;
         }
@@ -615,7 +603,6 @@
                 moveCount: moveCount,
                 halfMoveCount: halfMoveCount,
                 castlingRights: { ...castlingRights },
-                enPassantTarget: enPassantTarget,
                 lastMove: lastMove
             });
             
@@ -632,13 +619,6 @@
                 board[fromRow][rookFromCol] = '';
             }
             
-            // Handle en passant
-            if ((piece === '♙' || piece === '♟') && enPassantTarget && 
-                toRow === enPassantTarget.row && toCol === enPassantTarget.col) {
-                const capturedPawnRow = piece === '♙' ? toRow + 1 : toRow - 1;
-                board[capturedPawnRow][toCol] = '';
-            }
-            
             // Move piece
             board[toRow][toCol] = piece;
             board[fromRow][fromCol] = '';
@@ -651,7 +631,6 @@
             
             // Update game state
             updateCastlingRights(piece, fromRow, fromCol, toRow, toCol);
-            updateEnPassantTarget(piece, fromRow, toRow, toCol);
             updateHalfMoveClock(piece, capturedPiece);
             
             if (currentPlayer === 'black') {
@@ -712,17 +691,6 @@
             if (toRow === 0 && toCol === 7) castlingRights.blackKingside = false;
         }
 
-        function updateEnPassantTarget(piece, fromRow, toRow, toCol) {
-            enPassantTarget = null;
-            
-            if ((piece === '♙' || piece === '♟') && Math.abs(toRow - fromRow) === 2) {
-                enPassantTarget = {
-                    row: piece === '♙' ? fromRow - 1 : fromRow + 1,
-                    col: toCol
-                };
-            }
-        }
-
         function updateHalfMoveClock(piece, capturedPiece) {
             if ((piece === '♙' || piece === '♟') || capturedPiece) {
                 halfMoveCount = 0;
@@ -745,7 +713,7 @@
             let notation = '';
             
             if (piece === '♟' || piece === '♙') {
-                if (capturedPiece || (enPassantTarget && toRow === enPassantTarget.row && toCol === enPassantTarget.col)) {
+                if (capturedPiece) {
                     notation = files[fromCol] + 'x' + toSquare;
                 } else {
                     notation = toSquare;
@@ -971,12 +939,6 @@
                 score += (targetValue * 10 - pieceValue) * 100;
             }
             
-            // Check for en passant capture
-            if ((piece === '♙' || piece === '♟') && enPassantTarget && 
-                move.toRow === enPassantTarget.row && move.toCol === enPassantTarget.col) {
-                score += 100 * 100; // Value of captured pawn
-            }
-            
             // Killer moves heuristic
             const moveKey = `${move.fromRow}${move.fromCol}${move.toRow}${move.toCol}`;
             if (killerMoves.includes(moveKey)) {
@@ -1018,23 +980,10 @@
             const piece = board[move.fromRow][move.fromCol];
             const capturedPiece = board[move.toRow][move.toCol];
             
-            // Handle en passant capture
-            let enPassantCapture = null;
-            let enPassantCaptureRow = null;
-            if ((piece === '♙' || piece === '♟') && enPassantTarget && 
-                move.toRow === enPassantTarget.row && move.toCol === enPassantTarget.col) {
-                enPassantCaptureRow = piece === '♙' ? move.toRow + 1 : move.toRow - 1;
-                enPassantCapture = board[enPassantCaptureRow][move.toCol];
-                board[enPassantCaptureRow][move.toCol] = '';
-            }
-            
             tempMoveStack.push({
                 move: move,
                 piece: piece,
                 capturedPiece: capturedPiece,
-                enPassantCapture: enPassantCapture,
-                enPassantCaptureRow: enPassantCaptureRow,
-                oldEnPassantTarget: enPassantTarget,
                 oldCastlingRights: { ...castlingRights },
                 oldHalfMoveCount: halfMoveCount
             });
@@ -1052,17 +1001,8 @@
                 castlingRights.blackQueenside = false;
             }
             
-            // Quick en passant update
-            enPassantTarget = null;
-            if ((piece === '♙' || piece === '♟') && Math.abs(move.toRow - move.fromRow) === 2) {
-                enPassantTarget = {
-                    row: piece === '♙' ? move.fromRow - 1 : move.fromRow + 1,
-                    col: move.toCol
-                };
-            }
-            
             // Update half move clock
-            if ((piece === '♙' || piece === '♟') || capturedPiece || enPassantCapture) {
+            if ((piece === '♙' || piece === '♟') || capturedPiece) {
                 halfMoveCount = 0;
             } else {
                 halfMoveCount++;
@@ -1076,13 +1016,7 @@
             board[moveData.move.fromRow][moveData.move.fromCol] = moveData.piece;
             board[moveData.move.toRow][moveData.move.toCol] = moveData.capturedPiece;
             
-            // Restore en passant capture
-            if (moveData.enPassantCapture && moveData.enPassantCaptureRow !== null) {
-                board[moveData.enPassantCaptureRow][moveData.move.toCol] = moveData.enPassantCapture;
-            }
-            
             // Restore game state
-            enPassantTarget = moveData.oldEnPassantTarget;
             castlingRights = moveData.oldCastlingRights;
             halfMoveCount = moveData.oldHalfMoveCount;
         }
@@ -1227,10 +1161,6 @@
                                     if (board[toRow][toCol] && isPlayerPiece(board[toRow][toCol], player === 'white' ? 'black' : 'white')) {
                                         captures.push({ fromRow, fromCol, toRow, toCol });
                                     }
-                                    // En passant capture
-                                    if (enPassantTarget && toRow === enPassantTarget.row && toCol === enPassantTarget.col) {
-                                        captures.push({ fromRow, fromCol, toRow, toCol });
-                                    }
                                 }
                             }
                         } else {
@@ -1262,7 +1192,7 @@
                     hash += board[row][col] || '-';
                 }
             }
-            hash += currentPlayer + JSON.stringify(castlingRights) + JSON.stringify(enPassantTarget);
+            hash += currentPlayer + JSON.stringify(castlingRights);
             return hash;
         }
 
@@ -1391,10 +1321,6 @@
                         const toCol = fromCol + dc;
                         if (toRow >= 0 && toRow <= 7 && toCol >= 0 && toCol <= 7) {
                             if (board[toRow][toCol] && isPlayerPiece(board[toRow][toCol], player === 'white' ? 'black' : 'white')) {
-                                moves.push({ fromRow, fromCol, toRow, toCol });
-                            }
-                            // En passant
-                            if (enPassantTarget && toRow === enPassantTarget.row && toCol === enPassantTarget.col) {
                                 moves.push({ fromRow, fromCol, toRow, toCol });
                             }
                         }
@@ -1776,7 +1702,6 @@
                 blackQueenside: true
             };
             
-            enPassantTarget = null;
             repetitionHistory.clear();
             
             document.getElementById('current-player').textContent = 'White';
@@ -1815,7 +1740,6 @@
                 moveCount = lastState.moveCount;
                 halfMoveCount = lastState.halfMoveCount;
                 castlingRights = lastState.castlingRights;
-                enPassantTarget = lastState.enPassantTarget;
                 lastMove = lastState.lastMove;
                 gameOver = false;
                 
@@ -1839,310 +1763,5 @@
         updateEvaluation();
         document.getElementById('player-side').textContent = 'White';
     </script>
-<!-- TERMS POPUP + BOTTOM BAR (drop before </body>) -->
-<style>
-  /* Bottom bar */
-  #consent-bar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(20,20,20,0.95);
-    color: #fff;
-    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-    font-size: 13px;
-    padding: 12px 16px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 99999;
-    gap: 8px;
-    box-shadow: 0 -6px 24px rgba(0,0,0,0.5);
-  }
-  #consent-bar a {
-    color: #9be7ff;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-  #consent-bar button {
-    margin-left: 12px;
-    background: #0ea5a4;
-    border: none;
-    padding: 8px 12px;
-    color: white;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-  }
-
-  /* Modal backdrop */
-  .terms-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 100000;
-    padding: 20px;
-  }
-
-  /* Modal dialog */
-  .terms-modal {
-    width: min(1100px, 98%);
-    max-height: 90vh;
-    background: linear-gradient(180deg,#0f172a,#071029);
-    color: #e6eef8;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 12px 48px rgba(2,6,23,0.8);
-    display: flex;
-    flex-direction: column;
-    border: 1px solid rgba(255,255,255,0.04);
-  }
-
-  .terms-header {
-    padding: 16px 20px;
-    background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-  }
-  .terms-title { font-size: 16px; font-weight:700; }
-  .terms-close {
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.06);
-    color: #e6eef8;
-    padding: 6px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight:600;
-  }
-
-  .terms-body {
-    padding: 18px;
-    overflow: auto;
-    line-height: 1.45;
-    font-size: 13px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));
-  }
-  .terms-section { margin-bottom: 18px; }
-  .terms-section h3 { margin: 8px 0; font-size: 14px; color:#cfefff; }
-  .terms-actions {
-    display:flex;
-    gap:8px;
-    padding: 12px 18px;
-    border-top: 1px solid rgba(255,255,255,0.02);
-    justify-content: flex-end;
-    background: rgba(0,0,0,0.02);
-  }
-  .btn-accept {
-    background: #10b981;
-    border: none;
-    color: white;
-    padding: 10px 14px;
-    border-radius: 8px;
-    cursor:pointer;
-    font-weight:700;
-  }
-  .btn-decline {
-    background: transparent;
-    color: #c9d7e6;
-    border: 1px solid rgba(255,255,255,0.06);
-    padding: 10px 14px;
-    border-radius: 8px;
-    cursor:pointer;
-    font-weight:700;
-  }
-
-  /* small screens */
-  @media (max-width:520px){
-    #consent-bar { font-size:12px; padding:10px; }
-    .terms-title { font-size: 15px; }
-  }
-</style>
-
-<div id="consent-bar" role="status" aria-live="polite" style="display:none;">
-  <div>
-    By using this website you agree to the <a id="open-terms" href="#" aria-haspopup="dialog">Terms & Conditions</a>.
-  </div>
-  <button id="consent-accept-sm">Accept</button>
-</div>
-
-<div class="terms-backdrop" id="terms-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="terms-title">
-  <div class="terms-modal" role="document">
-    <div class="terms-header">
-      <div class="terms-title" id="terms-title">Centuar AI — Terms & Conditions (Access-Only)</div>
-      <div style="display:flex;gap:8px;">
-        <button class="terms-close" id="terms-close">Close</button>
-      </div>
-    </div>
-
-    <div class="terms-body" id="terms-body" tabindex="0">
-      <!-- Long terms text -->
-      <div class="terms-section">
-        <h3>1. Acceptance</h3>
-        <p>These Terms and Conditions ("Terms") govern your access to and use of the website hosted at <strong>https://centuarai.netlify.app</strong> ("Site"). By using or accessing the Site in any manner, you agree to be bound by these Terms. If you do not agree, immediately stop using the Site.</p>
-      </div>
-
-      <div class="terms-section">
-        <h3>2. Access-Only License</h3>
-        <p>The Site is provided under an access-only license. Your rights are strictly limited to interacting with and viewing the content presented in your browser while connected to the Site. You are expressly prohibited from copying, downloading, scraping, mirroring, or otherwise obtaining the underlying source code, assets, models, engine logic, or data from the Site by any means.</p>
-      </div>
-
-      <div class="terms-section">
-        <h3>3. Prohibited Conduct</h3>
-        <ul>
-          <li>Do not attempt to access the server-side code, configuration files, or build pipeline.</li>
-          <li>Do not decompile, reverse-engineer, disassemble, reproduce, or create derivative works from the Site or its responses.</li>
-          <li>Do not host, redistribute, or publicly disclose any part of the Site content (including screenshots that reveal proprietary UI or logic) without explicit written permission.</li>
-        </ul>
-      </div>
-
-      <div class="terms-section">
-        <h3>4. Enforcement</h3>
-        <p>Violations are grounds for immediate termination of access and may result in civil and/or criminal liability to the fullest extent permitted by law. The author reserves all rights, including the right to pursue takedown procedures (e.g., DMCA) and legal claims. Copyright in the Site content vests automatically in the author upon creation; registration of copyright is not required for protection.</p>
-      </div>
-
-      <div class="terms-section">
-        <h3>5. Disclaimer & Limitation</h3>
-        <p>The Site and all content are provided "as is" without warranties of any kind. The author is not liable for incidental or consequential damages arising from use of the Site, to the maximum extent permitted by applicable law.</p>
-      </div>
-
-      <div class="terms-section">
-        <h3>6. Data Collection & Security</h3>
-        <p>The Site may collect non-sensitive usage information to operate and maintain services. Any scraping or unauthorized data extraction is forbidden and will be treated as an abuse incident.</p>
-      </div>
-
-      <div class="terms-section">
-        <h3>7. Severability & Changes</h3>
-        <p>If any provision of these Terms is found invalid, remaining provisions continue in full force. The author may modify these Terms at any time; continued use after notice constitutes acceptance.</p>
-      </div>
-
-      <div class="terms-section">
-        <h3>8. Contact</h3>
-        <p>For permissions, licensing, or legal matters, contact the site owner at the address or email posted on the Site.</p>
-      </div>
-
-      <div class="terms-section">
-        <h3>Appendix — Example Restrictive Clauses</h3>
-        <p>This appendix includes sample strong statements that reflect the enforcement approach used by the author (not an exhaustive list):</p>
-        <ol>
-          <li>"All code, runtime logic, build artifacts and UI assets are owned exclusively by the author and are protected by copyright and other intellectual property laws."</li>
-          <li>"Unauthorized access, copying, or distribution will result in immediate takedown requests and may lead to civil litigation."</li>
-          <li>"Your only license is to access the Site via the provided URL; any other use is a material breach of these Terms."</li>
-        </ol>
-      </div>
-
-      <div style="height:18px;"></div>
-    </div>
-
-    <div class="terms-actions" role="toolbar" aria-label="Terms actions">
-      <button class="btn-decline" id="btn-decline">Decline</button>
-      <button class="btn-accept" id="btn-accept">I Agree</button>
-    </div>
-  </div>
-</div>
-
-<script>
-  (function(){
-    const BAR_KEY = 'centuar_terms_accepted_v1';
-    const consentBar = document.getElementById('consent-bar');
-    const openTerms = document.getElementById('open-terms');
-    const backdrop = document.getElementById('terms-backdrop');
-    const closeBtn = document.getElementById('terms-close');
-    const acceptBtn = document.getElementById('btn-accept');
-    const declineBtn = document.getElementById('btn-decline');
-    const acceptSm = document.getElementById('consent-accept-sm');
-
-    // show or hide bar based on localStorage
-    function showBarIfNeeded(){
-      try {
-        if (!localStorage.getItem(BAR_KEY)) {
-          consentBar.style.display = 'flex';
-        } else {
-          consentBar.style.display = 'none';
-        }
-      } catch (e) {
-        consentBar.style.display = 'flex';
-      }
-    }
-
-    // open modal
-    function openModal() {
-      backdrop.style.display = 'flex';
-      backdrop.setAttribute('aria-hidden','false');
-      // trap focus: focus the scrollable body
-      const body = document.getElementById('terms-body');
-      body.focus();
-      document.addEventListener('keydown', handleKeyDown);
-    }
-
-    // close modal
-    function closeModal() {
-      backdrop.style.display = 'none';
-      backdrop.setAttribute('aria-hidden','true');
-      document.removeEventListener('keydown', handleKeyDown);
-    }
-
-    // Accept terms: set localStorage and hide bar & modal
-    function acceptTerms() {
-      try { localStorage.setItem(BAR_KEY, Date.now().toString()); } catch(e){}
-      consentBar.style.display = 'none';
-      closeModal();
-      // optional: show a tiny non-intrusive toast confirmation
-      showTinyToast('Thanks — terms accepted.');
-    }
-
-    // Decline: redirect or block (here we politely close and keep bar)
-    function declineTerms() {
-      closeModal();
-      showTinyToast('You declined. Access is limited until terms are accepted.');
-    }
-
-    function handleKeyDown(e) {
-      if (e.key === 'Escape') closeModal();
-      // simple focus trap: keep focus inside modal on Tab
-      if (e.key === 'Tab') {
-        const focusable = backdrop.querySelectorAll('button, [href], input, textarea, [tabindex]:not([tabindex="-1"])');
-        if (!focusable.length) return;
-        const first = focusable[0], last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault(); last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault(); first.focus();
-        }
-      }
-    }
-
-    // tiny toast feedback (non-blocking)
-    function showTinyToast(msg){
-      const t = document.createElement('div');
-      t.textContent = msg;
-      Object.assign(t.style, {
-        position:'fixed', right:'18px', bottom:'78px', background:'rgba(0,0,0,0.7)', color:'#fff',
-        padding:'8px 12px', borderRadius:'8px', zIndex:100001, fontSize:'13px'
-      });
-      document.body.appendChild(t);
-      setTimeout(()=> t.style.opacity = '0.0', 2500);
-      setTimeout(()=> document.body.removeChild(t), 3200);
-    }
-
-    // event bindings
-    openTerms.addEventListener('click', (e)=>{ e.preventDefault(); openModal(); });
-    consentBar.querySelector('#consent-accept-sm').addEventListener('click', acceptTerms);
-    closeBtn.addEventListener('click', closeModal);
-    acceptBtn.addEventListener('click', acceptTerms);
-    declineBtn.addEventListener('click', declineTerms);
-
-    // initialize
-    showBarIfNeeded();
-
-    // OPTIONAL: if you want the bar to appear only after a delay (uncomment)
-    // setTimeout(showBarIfNeeded, 2000);
-  })();
-</script>
-
 </body>
 </html>
