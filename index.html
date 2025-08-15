@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess Game</title>
+    <title>Chess Game - AI Learning Edition</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -206,24 +206,7 @@
             font-weight: bold;
         }
 
-        .difficulty-controls {
-            text-align: center;
-            margin: 15px 0;
-        }
-
-        .difficulty-controls label {
-            font-weight: bold;
-            margin-right: 10px;
-        }
-
-        .difficulty-controls select {
-            padding: 5px;
-            font-size: 14px;
-            border-radius: 3px;
-            border: 1px solid #ccc;
-        }
-
-        .performance-info {
+        .ai-info {
             text-align: center;
             margin: 10px 0;
             padding: 8px;
@@ -232,11 +215,21 @@
             font-size: 14px;
             color: #333;
         }
+
+        .sync-status {
+            text-align: center;
+            margin: 5px 0;
+            padding: 5px;
+            background: #e8f5e8;
+            border-radius: 3px;
+            font-size: 12px;
+            color: #2d5a2d;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>♔ Advanced Chess Game - Fixed ♛</h1>
+        <h1>♔ Advanced Chess Game - AI Learning Edition ♛</h1>
         
         <div class="game-info">
             <div class="info-section">
@@ -258,23 +251,17 @@
             </select>
         </div>
 
-        <div class="difficulty-controls" id="ai-controls">
-            <label for="difficulty">AI Difficulty:</label>
-            <select id="difficulty" onchange="changeDifficulty()">
-                <option value="1">Beginner (Depth 1)</option>
-                <option value="2">Easy (Depth 2)</option>
-                <option value="3">Normal (Depth 3)</option>
-                <option value="4" selected>Hard (Depth 4)</option>
-                <option value="5">Expert (Depth 5)</option>
-                <option value="6">Master (Depth 6)</option>
-            </select>
+        <div class="ai-info" id="ai-info">
+            AI Games Played: <span id="games-played">0</span> | 
+            Win Rate: <span id="win-rate">0%</span>
         </div>
-
+        
+        <div class="sync-status" id="sync-status">Ready to sync</div>
+        
         <div class="evaluation" id="evaluation">Position evaluation: 0.00</div>
-        <div class="performance-info" id="performance">Ready to play</div>
         
         <div id="status" class="status">White to move</div>
-        <div id="thinking" class="thinking" style="display: none;">🤔 AI is calculating... (depth: <span id="search-depth">4</span>)</div>
+        <div id="thinking" class="thinking" style="display: none;">🤔 AI is calculating... (Depth: 6)</div>
         
         <div id="chessboard"></div>
         
@@ -282,7 +269,6 @@
             <button onclick="newGame()">New Game</button>
             <button onclick="undoMove()" id="undo-btn">Undo Move</button>
             <button onclick="switchSides()" id="switch-sides-btn">Switch Sides</button>
-            <button onclick="analyzePosition()" id="analyze-btn">Analyze</button>
         </div>
         
         <div class="move-history">
@@ -309,13 +295,31 @@
         let gameHistory = [];
         let moveHistory = [];
         let gameOver = false;
-        let gameMode = 'ai'; // 'ai' or 'player'
+        let gameMode = 'ai';
         let humanPlayer = 'white';
-        let aiDepth = 4;
+        const aiDepth = 6; // Fixed depth
         let moveCount = 1;
         let halfMoveCount = 0;
         let lastMove = null;
-        let isAnalyzing = false;
+        
+        // AI Learning System
+        let aiMemory = {
+            gamesPlayed: 0,
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            openingBook: {},
+            endgamePatterns: {},
+            positionEvaluations: new Map()
+        };
+        
+        // GitHub sync variables
+        const GITHUB_TOKEN = process.env.ACESS_KEY; // Fixed secret name
+        const REPO_OWNER = 'your-username';
+        const REPO_NAME = 'chess-ai-memory';
+        const FILE_PATH = 'ai-memory.json';
+        let lastSyncTime = 0;
+        const SYNC_INTERVAL = 10000; // 10 seconds
         
         // Game state tracking
         let castlingRights = {
@@ -326,11 +330,7 @@
         };
         
         let enPassantTarget = null;
-
-        // AI optimization variables
-        let searchStartTime = 0;
-        let nodesSearched = 0;
-        let transpositionTable = new Map();
+        let isThinking = false;
 
         // Piece mappings
         const pieceMap = {
@@ -343,12 +343,24 @@
             'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
         };
 
-        // Piece values
+        // Piece values for evaluation
         const PIECE_VALUES = {
             '♙': 100, '♘': 320, '♗': 330, '♖': 500, '♕': 900, '♔': 20000,
             '♟': 100, '♞': 320, '♝': 330, '♜': 500, '♛': 900, '♚': 20000,
             '': 0
         };
+
+        // Position-specific piece values
+        const PAWN_TABLE = [
+            [0,  0,  0,  0,  0,  0,  0,  0],
+            [50, 50, 50, 50, 50, 50, 50, 50],
+            [10, 10, 20, 30, 30, 20, 10, 10],
+            [5,  5, 10, 25, 25, 10,  5,  5],
+            [0,  0,  0, 20, 20,  0,  0,  0],
+            [5, -5,-10,  0,  0,-10, -5,  5],
+            [5, 10, 10,-20,-20, 10, 10,  5],
+            [0,  0,  0,  0,  0,  0,  0,  0]
+        ];
 
         function createBoard() {
             const boardElement = document.getElementById('chessboard');
@@ -389,7 +401,7 @@
         }
 
         function handleSquareClick(row, col) {
-            if (gameOver || isAnalyzing) return;
+            if (gameOver || isThinking) return;
             
             // In AI mode, only allow human player to move
             if (gameMode === 'ai' && currentPlayer !== humanPlayer) return;
@@ -455,10 +467,8 @@
                     if (isValidMove(row, col, r, c)) {
                         const square = document.getElementById(`square-${r}-${c}`);
                         if (board[r][c] && isPlayerPiece(board[r][c], currentPlayer === 'white' ? 'black' : 'white')) {
-                            // Blue background for captures (like chess.com)
                             square.classList.add('capture-move');
                         } else {
-                            // Green background for regular moves
                             square.classList.add('possible-move');
                         }
                     }
@@ -491,8 +501,8 @@
             // Can't capture own piece
             if (targetPiece && isPlayerPiece(targetPiece, currentPlayer)) return false;
             
-            // Special case: castling
-            if ((piece === '♔' || piece === '♚') && Math.abs(toCol - fromCol) === 2) {
+            // Special case: castling - FIX THE CASTLING GLITCH
+            if ((piece === '♔' || piece === '♚') && Math.abs(toCol - fromCol) === 2 && fromRow === toRow) {
                 return canCastle(fromRow, fromCol, toRow, toCol);
             }
             
@@ -522,6 +532,7 @@
                 case 'q':
                     return (dx === 0 || dy === 0 || absDx === absDy) && isPathClear(fromRow, fromCol, toRow, toCol);
                 case 'k':
+                    // Fixed: King can only move 1 square unless castling
                     return absDx <= 1 && absDy <= 1;
                 default:
                     return false;
@@ -602,6 +613,12 @@
             const isWhite = piece === '♔';
             const isKingside = toCol > fromCol;
             
+            // Must be on correct row
+            if ((isWhite && fromRow !== 7) || (!isWhite && fromRow !== 0)) return false;
+            
+            // Must move exactly 2 squares
+            if (Math.abs(toCol - fromCol) !== 2) return false;
+            
             // Check castling rights
             if (isWhite) {
                 if (isKingside && !castlingRights.whiteKingside) return false;
@@ -635,7 +652,7 @@
                     // Temporarily place king
                     const originalPiece = board[fromRow][testCol];
                     board[fromRow][testCol] = piece;
-                    board[fromRow][fromCol] = '';
+                    if (testCol !== fromCol) board[fromRow][fromCol] = '';
                     
                     const inCheck = isKingInCheck(board, currentPlayer);
                     
@@ -789,7 +806,10 @@
                 moveCount++;
             }
             
-            // Record move
+            // Record move for AI learning
+            recordMoveForAI(piece, fromRow, fromCol, toRow, toCol, capturedPiece);
+            
+            // Record move notation
             const moveNotation = getMoveNotation(piece, fromRow, fromCol, toRow, toCol, capturedPiece);
             moveHistory.push(moveNotation);
             updateMoveHistory();
@@ -853,6 +873,171 @@
             }
         }
 
+        // AI Learning Functions
+        function recordMoveForAI(piece, fromRow, fromCol, toRow, toCol, capturedPiece) {
+            if (gameMode !== 'ai') return;
+            
+            const positionKey = getBoardHash();
+            const move = { fromRow, fromCol, toRow, toCol };
+            
+            // Record opening moves (first 10 moves)
+            if (moveHistory.length < 20) {
+                const openingKey = moveHistory.join(',');
+                if (!aiMemory.openingBook[openingKey]) {
+                    aiMemory.openingBook[openingKey] = [];
+                }
+                aiMemory.openingBook[openingKey].push(move);
+            }
+            
+            // Record position evaluations for learning
+            const evaluation = evaluatePosition();
+            aiMemory.positionEvaluations.set(positionKey, evaluation);
+        }
+
+        function getBoardHash() {
+            // Simple hash of board position
+            let hash = '';
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    hash += board[row][col] || '.';
+                }
+            }
+            return hash + currentPlayer;
+        }
+
+        function recordGameResult(result) {
+            aiMemory.gamesPlayed++;
+            
+            if (result === 'win' && humanPlayer !== currentPlayer) {
+                aiMemory.wins++;
+            } else if (result === 'loss' && humanPlayer === currentPlayer) {
+                aiMemory.losses++;
+            } else if (result === 'draw') {
+                aiMemory.draws++;
+            }
+            
+            updateAIStats();
+            scheduleSync();
+        }
+
+        function updateAIStats() {
+            document.getElementById('games-played').textContent = aiMemory.gamesPlayed;
+            const winRate = aiMemory.gamesPlayed > 0 ? 
+                Math.round((aiMemory.wins / aiMemory.gamesPlayed) * 100) : 0;
+            document.getElementById('win-rate').textContent = winRate + '%';
+        }
+
+        // GitHub Sync Functions
+        async function syncToGitHub() {
+            if (!GITHUB_TOKEN) return;
+            
+            try {
+                document.getElementById('sync-status').textContent = 'Syncing...';
+                
+                const memoryData = {
+                    ...aiMemory,
+                    positionEvaluations: Array.from(aiMemory.positionEvaluations.entries()),
+                    lastSync: new Date().toISOString()
+                };
+                
+                const content = btoa(JSON.stringify(memoryData, null, 2));
+                
+                // Get current file SHA if it exists
+                let sha = null;
+                try {
+                    const getResponse = await fetch(
+                        `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`,
+                        {
+                            headers: {
+                                'Authorization': `token ${GITHUB_TOKEN}`,
+                                'Accept': 'application/vnd.github.v3+json'
+                            }
+                        }
+                    );
+                    
+                    if (getResponse.ok) {
+                        const fileData = await getResponse.json();
+                        sha = fileData.sha;
+                    }
+                } catch (e) {
+                    console.log('File might not exist, creating new one');
+                }
+                
+                // Update or create file
+                const updateResponse = await fetch(
+                    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${GITHUB_TOKEN}`,
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message: `Update AI memory - Games: ${aiMemory.gamesPlayed}`,
+                            content: content,
+                            sha: sha
+                        })
+                    }
+                );
+                
+                if (updateResponse.ok) {
+                    document.getElementById('sync-status').textContent = 'Synced successfully';
+                    lastSyncTime = Date.now();
+                } else {
+                    throw new Error('Failed to sync');
+                }
+                
+            } catch (error) {
+                console.error('Sync failed:', error);
+                document.getElementById('sync-status').textContent = 'Sync failed';
+            }
+        }
+
+        async function loadFromGitHub() {
+            if (!GITHUB_TOKEN) return;
+            
+            try {
+                const response = await fetch(
+                    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`,
+                    {
+                        headers: {
+                            'Authorization': `token ${GITHUB_TOKEN}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+                
+                if (response.ok) {
+                    const fileData = await response.json();
+                    const content = JSON.parse(atob(fileData.content));
+                    
+                    aiMemory = {
+                        ...content,
+                        positionEvaluations: new Map(content.positionEvaluations || [])
+                    };
+                    
+                    updateAIStats();
+                    document.getElementById('sync-status').textContent = 'Loaded from GitHub';
+                }
+            } catch (error) {
+                console.error('Failed to load from GitHub:', error);
+            }
+        }
+
+        function scheduleSync() {
+            if (Date.now() - lastSyncTime > SYNC_INTERVAL) {
+                syncToGitHub();
+            }
+        }
+
+        // Auto-sync every 10 seconds
+        setInterval(() => {
+            if (Date.now() - lastSyncTime >= SYNC_INTERVAL) {
+                syncToGitHub();
+            }
+        }, SYNC_INTERVAL);
+
         function getMoveNotation(piece, fromRow, fromCol, toRow, toCol, capturedPiece) {
             const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
             const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
@@ -912,6 +1097,7 @@
                     statusElement.textContent = `Checkmate! ${playerName === 'White' ? 'Black' : 'White'} wins!`;
                     statusElement.style.backgroundColor = '#ffcccb';
                     gameOver = true;
+                    recordGameResult(playerName === 'White' ? 'loss' : 'win');
                 } else {
                     statusElement.textContent = `${playerName} is in check!`;
                     statusElement.style.backgroundColor = '#ffe4b5';
@@ -922,14 +1108,17 @@
                     statusElement.textContent = 'Stalemate! It\'s a draw!';
                     statusElement.style.backgroundColor = '#e6e6fa';
                     gameOver = true;
+                    recordGameResult('draw');
                 } else if (halfMoveCount >= 100) {
                     statusElement.textContent = '50-move rule! It\'s a draw!';
                     statusElement.style.backgroundColor = '#e6e6fa';
                     gameOver = true;
+                    recordGameResult('draw');
                 } else if (isInsufficientMaterial()) {
                     statusElement.textContent = 'Insufficient material! It\'s a draw!';
                     statusElement.style.backgroundColor = '#e6e6fa';
                     gameOver = true;
+                    recordGameResult('draw');
                 } else {
                     statusElement.textContent = `${playerName} to move`;
                     statusElement.style.backgroundColor = '#f9f9f9';
@@ -1052,11 +1241,26 @@
                         const value = PIECE_VALUES[piece];
                         if (isPlayerPiece(piece, 'white')) {
                             score += value;
+                            // Add positional bonuses
+                            if (piece === '♙') {
+                                score += PAWN_TABLE[row][col];
+                            }
                         } else {
                             score -= value;
+                            // Add positional bonuses for black (flipped table)
+                            if (piece === '♟') {
+                                score -= PAWN_TABLE[7 - row][col];
+                            }
                         }
                     }
                 }
+            }
+            
+            // Use AI memory for position evaluation if available
+            const positionKey = getBoardHash();
+            if (aiMemory.positionEvaluations.has(positionKey)) {
+                const memorizedEval = aiMemory.positionEvaluations.get(positionKey);
+                score = (score + memorizedEval) / 2; // Average with memorized evaluation
             }
             
             return score;
@@ -1082,19 +1286,16 @@
             moveList.scrollTop = moveList.scrollHeight;
         }
 
-        // AI FUNCTIONS
+        // Enhanced AI Functions with Learning
         function makeAIMove() {
-            if (gameOver || gameMode !== 'ai') return;
+            if (gameOver || gameMode !== 'ai' || isThinking) return;
             
+            isThinking = true;
             document.getElementById('thinking').style.display = 'block';
-            document.getElementById('search-depth').textContent = aiDepth;
-            
-            searchStartTime = performance.now();
-            nodesSearched = 0;
             
             setTimeout(() => {
                 try {
-                    const bestMove = getBestMove(currentPlayer, aiDepth);
+                    const bestMove = getBestMoveWithLearning(currentPlayer);
                     
                     if (bestMove) {
                         makeMove(bestMove.fromRow, bestMove.fromCol, bestMove.toRow, bestMove.toCol);
@@ -1115,15 +1316,28 @@
                     }
                 }
                 
-                const searchTime = performance.now() - searchStartTime;
-                document.getElementById('performance').textContent = 
-                    `Search: ${Math.round(searchTime)}ms, Nodes: ${nodesSearched}`;
-                
+                isThinking = false;
                 document.getElementById('thinking').style.display = 'none';
             }, 100);
         }
 
-        function getBestMove(player, depth) {
+        function getBestMoveWithLearning(player) {
+            // First check opening book
+            if (moveHistory.length < 20) {
+                const openingKey = moveHistory.join(',');
+                if (aiMemory.openingBook[openingKey]) {
+                    const bookMoves = aiMemory.openingBook[openingKey];
+                    const validBookMoves = bookMoves.filter(move => 
+                        isValidMove(move.fromRow, move.fromCol, move.toRow, move.toCol)
+                    );
+                    
+                    if (validBookMoves.length > 0) {
+                        return validBookMoves[Math.floor(Math.random() * validBookMoves.length)];
+                    }
+                }
+            }
+            
+            // Use minimax with learning
             const moves = getAllPossibleMoves(player);
             if (moves.length === 0) return null;
             
@@ -1131,7 +1345,7 @@
             let bestScore = player === 'white' ? -Infinity : Infinity;
             
             for (const move of moves) {
-                const score = evaluateMoveWithMinimax(move, depth - 1);
+                const score = evaluateMoveWithMinimax(move, aiDepth - 1);
                 
                 if ((player === 'white' && score > bestScore) || 
                     (player === 'black' && score < bestScore)) {
@@ -1158,8 +1372,6 @@
             } else {
                 score = minimax(depth, currentPlayer === 'white' ? 'black' : 'white', -Infinity, Infinity);
             }
-            
-            nodesSearched++;
             
             // Restore board
             board[move.fromRow][move.fromCol] = piece;
@@ -1229,35 +1441,30 @@
             }
         }
 
-        // GAME CONTROL FUNCTIONS
+        // Game Control Functions
         function changeGameMode() {
             const gameModeSelect = document.getElementById('gameMode');
             gameMode = gameModeSelect.value;
             
-            const aiControls = document.getElementById('ai-controls');
             const switchSidesBtn = document.getElementById('switch-sides-btn');
             const gameModeDisplay = document.getElementById('game-mode-display');
+            const aiInfo = document.getElementById('ai-info');
             
             if (gameMode === 'ai') {
-                aiControls.style.display = 'block';
                 switchSidesBtn.style.display = 'inline-block';
                 gameModeDisplay.textContent = 'vs AI';
+                aiInfo.style.display = 'block';
             } else {
-                aiControls.style.display = 'none';
                 switchSidesBtn.style.display = 'none';
                 gameModeDisplay.textContent = 'vs Player';
+                aiInfo.style.display = 'none';
             }
             
             // Stop AI thinking if switching to player mode
             if (gameMode === 'player') {
                 document.getElementById('thinking').style.display = 'none';
+                isThinking = false;
             }
-        }
-
-        function changeDifficulty() {
-            const difficulty = document.getElementById('difficulty').value;
-            aiDepth = parseInt(difficulty);
-            transpositionTable.clear();
         }
 
         function switchSides() {
@@ -1269,47 +1476,6 @@
             if (!gameOver && currentPlayer !== humanPlayer && gameMode === 'ai') {
                 setTimeout(makeAIMove, 300);
             }
-        }
-
-        function analyzePosition() {
-            if (isAnalyzing) return;
-            
-            isAnalyzing = true;
-            const analyzeBtn = document.getElementById('analyze-btn');
-            analyzeBtn.textContent = 'Analyzing...';
-            analyzeBtn.disabled = true;
-            
-            setTimeout(() => {
-                try {
-                    searchStartTime = performance.now();
-                    nodesSearched = 0;
-                    
-                    const evaluation = evaluatePosition();
-                    const bestMove = getBestMove(currentPlayer, Math.min(aiDepth + 1, 6));
-                    
-                    const searchTime = performance.now() - searchStartTime;
-                    
-                    let analysis = `Position evaluation: ${(evaluation / 100).toFixed(2)}\n`;
-                    analysis += `Search time: ${Math.round(searchTime)}ms\n`;
-                    analysis += `Nodes searched: ${nodesSearched}\n`;
-                    
-                    if (bestMove) {
-                        const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-                        const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
-                        const from = files[bestMove.fromCol] + ranks[bestMove.fromRow];
-                        const to = files[bestMove.toCol] + ranks[bestMove.toRow];
-                        analysis += `Best move: ${from}-${to}`;
-                    }
-                    
-                    alert(analysis);
-                } catch (e) {
-                    alert('Analysis failed: ' + e.message);
-                }
-                
-                isAnalyzing = false;
-                analyzeBtn.textContent = 'Analyze';
-                analyzeBtn.disabled = false;
-            }, 100);
         }
 
         function newGame() {
@@ -1335,6 +1501,7 @@
             gameOver = false;
             lastMove = null;
             enPassantTarget = null;
+            isThinking = false;
             
             castlingRights = {
                 whiteKingside: true,
@@ -1343,11 +1510,8 @@
                 blackQueenside: true
             };
             
-            transpositionTable.clear();
-            
             document.getElementById('current-player').textContent = 'White';
             document.getElementById('move-counter').textContent = '1';
-            document.getElementById('performance').textContent = 'Ready to play';
             document.getElementById('thinking').style.display = 'none';
             
             createBoard();
@@ -1375,9 +1539,11 @@
             lastMove = lastState.lastMove;
             enPassantTarget = lastState.enPassantTarget;
             gameOver = false;
+            isThinking = false;
             
             document.getElementById('current-player').textContent = currentPlayer === 'white' ? 'White' : 'Black';
             document.getElementById('move-counter').textContent = moveCount;
+            document.getElementById('thinking').style.display = 'none';
             
             clearSelection();
             createBoard();
@@ -1387,12 +1553,257 @@
         }
 
         // Initialize the game
-        window.onload = function() {
+        window.onload = async function() {
+            // Load AI memory from GitHub
+            await loadFromGitHub();
+            
             createBoard();
             updateStatus();
             updateEvaluation();
+            updateAIStats();
             changeGameMode(); // Set initial display state
+            
+            // Start periodic sync
+            setInterval(() => {
+                if (aiMemory.gamesPlayed > 0 && Date.now() - lastSyncTime >= SYNC_INTERVAL) {
+                    syncToGitHub();
+                }
+            }, 1000); // Check every second
         };
+
+        // Prevent pieces from randomly spawning by ensuring board state integrity
+        function validateBoardState() {
+            // Count pieces to prevent duplication
+            const pieceCounts = {};
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const piece = board[row][col];
+                    if (piece) {
+                        pieceCounts[piece] = (pieceCounts[piece] || 0) + 1;
+                    }
+                }
+            }
+            
+            // Check for illegal piece counts (e.g., more than 8 pawns per side)
+            const maxCounts = {
+                '♙': 8, '♟': 8, // Pawns
+                '♖': 2, '♜': 2, // Rooks  
+                '♘': 2, '♞': 2, // Knights
+                '♗': 2, '♝': 2, // Bishops
+                '♕': 1, '♛': 1, // Queens
+                '♔': 1, '♚': 1  // Kings
+            };
+            
+            for (const [piece, count] of Object.entries(pieceCounts)) {
+                if (count > maxCounts[piece]) {
+                    console.warn(`Invalid piece count detected: ${piece} appears ${count} times`);
+                    // Reset to starting position if corruption detected
+                    newGame();
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+
+        // Enhanced error handling for move validation
+        function safeIsValidMove(fromRow, fromCol, toRow, toCol) {
+            try {
+                // Validate board state first
+                if (!validateBoardState()) return false;
+                
+                return isValidMove(fromRow, fromCol, toRow, toCol);
+            } catch (error) {
+                console.error("Error in move validation:", error);
+                return false;
+            }
+        }
+
+        // Override the original function with the safe version
+        const originalIsValidMove = isValidMove;
+        isValidMove = safeIsValidMove;
+
+        // Add periodic board validation
+        setInterval(() => {
+            if (!gameOver && !isThinking) {
+                validateBoardState();
+            }
+        }, 5000); // Check every 5 seconds
+
+        // Enhanced GitHub integration with better error handling
+        async function safeSyncToGitHub() {
+            try {
+                await syncToGitHub();
+            } catch (error) {
+                console.error("Sync error:", error);
+                document.getElementById('sync-status').textContent = 'Sync error - retrying...';
+                
+                // Retry after 30 seconds
+                setTimeout(() => {
+                    safeSyncToGitHub();
+                }, 30000);
+            }
+        }
+
+        // Replace the original sync function
+        syncToGitHub = safeSyncToGitHub;
+
+        // Add connection status monitoring
+        function updateConnectionStatus() {
+            if (navigator.onLine) {
+                document.getElementById('sync-status').style.backgroundColor = '#e8f5e8';
+            } else {
+                document.getElementById('sync-status').textContent = 'Offline - sync paused';
+                document.getElementById('sync-status').style.backgroundColor = '#ffe8e8';
+            }
+        }
+
+        window.addEventListener('online', updateConnectionStatus);
+        window.addEventListener('offline', updateConnectionStatus);
+
+        // Improve AI decision making with more sophisticated evaluation
+        function getAdvancedEvaluation() {
+            let score = evaluatePosition();
+            
+            // Add mobility bonus (number of legal moves)
+            const whiteMoves = getAllPossibleMoves('white').length;
+            const blackMoves = getAllPossibleMoves('black').length;
+            score += (whiteMoves - blackMoves) * 2;
+            
+            // Add king safety evaluation
+            score += evaluateKingSafety('white') - evaluateKingSafety('black');
+            
+            // Add control of center squares
+            score += evaluateCenterControl();
+            
+            return score;
+        }
+
+        function evaluateKingSafety(player) {
+            const kingSymbol = player === 'white' ? '♔' : '♚';
+            let kingRow = -1, kingCol = -1;
+            
+            // Find king
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if (board[row][col] === kingSymbol) {
+                        kingRow = row;
+                        kingCol = col;
+                        break;
+                    }
+                }
+                if (kingRow !== -1) break;
+            }
+            
+            if (kingRow === -1) return -1000; // King missing (should not happen)
+            
+            let safety = 0;
+            
+            // Penalty for king in center during middle game
+            if (moveCount < 30) {
+                if (kingCol >= 2 && kingCol <= 5) safety -= 20;
+                if (kingRow >= 2 && kingRow <= 5) safety -= 20;
+            }
+            
+            // Bonus for castling
+            const castled = player === 'white' ? 
+                (!castlingRights.whiteKingside && !castlingRights.whiteQueenside) :
+                (!castlingRights.blackKingside && !castlingRights.blackQueenside);
+            
+            if (castled) safety += 50;
+            
+            return safety;
+        }
+
+        function evaluateCenterControl() {
+            let score = 0;
+            const centerSquares = [[3,3], [3,4], [4,3], [4,4]];
+            
+            for (const [row, col] of centerSquares) {
+                const piece = board[row][col];
+                if (piece) {
+                    if (isPlayerPiece(piece, 'white')) {
+                        score += 10;
+                    } else {
+                        score -= 10;
+                    }
+                }
+            }
+            
+            return score;
+        }
+
+        // Replace the basic evaluation with advanced evaluation
+        const originalEvaluatePosition = evaluatePosition;
+        evaluatePosition = function() {
+            const basicEval = originalEvaluatePosition();
+            const advancedEval = getAdvancedEvaluation();
+            
+            // Blend basic and advanced evaluation
+            return Math.round((basicEval + advancedEval) / 2);
+        };
+
+        // Add game statistics tracking
+        let gameStats = {
+            totalMoves: 0,
+            capturedPieces: 0,
+            checksGiven: 0,
+            castlingPerformed: false
+        };
+
+        function updateGameStats(piece, capturedPiece, fromRow, fromCol, toRow, toCol) {
+            gameStats.totalMoves++;
+            
+            if (capturedPiece) {
+                gameStats.capturedPieces++;
+            }
+            
+            if (isKingInCheck(board, currentPlayer === 'white' ? 'black' : 'white')) {
+                gameStats.checksGiven++;
+            }
+            
+            if ((piece === '♔' || piece === '♚') && Math.abs(toCol - fromCol) === 2) {
+                gameStats.castlingPerformed = true;
+            }
+        }
+
+        // Enhanced move making with statistics
+        const originalMakeMove = makeMove;
+        makeMove = function(fromRow, fromCol, toRow, toCol) {
+            const piece = board[fromRow][fromCol];
+            const capturedPiece = board[toRow][toCol];
+            
+            updateGameStats(piece, capturedPiece, fromRow, fromCol, toRow, toCol);
+            originalMakeMove(fromRow, fromCol, toRow, toCol);
+        };
+
+        // Add performance monitoring
+        let performanceMetrics = {
+            aiThinkTime: [],
+            movesPerSecond: 0,
+            lastMoveTime: Date.now()
+        };
+
+        function updatePerformanceMetrics(thinkTime) {
+            performanceMetrics.aiThinkTime.push(thinkTime);
+            
+            // Keep only last 10 measurements
+            if (performanceMetrics.aiThinkTime.length > 10) {
+                performanceMetrics.aiThinkTime.shift();
+            }
+            
+            const avgThinkTime = performanceMetrics.aiThinkTime.reduce((a, b) => a + b, 0) / performanceMetrics.aiThinkTime.length;
+            
+            const currentTime = Date.now();
+            const timeSinceLastMove = currentTime - performanceMetrics.lastMoveTime;
+            performanceMetrics.movesPerSecond = timeSinceLastMove > 0 ? 1000 / timeSinceLastMove : 0;
+            performanceMetrics.lastMoveTime = currentTime;
+            
+            console.log(`AI Performance - Avg Think Time: ${avgThinkTime.toFixed(0)}ms, Moves/sec: ${performanceMetrics.movesPerSecond.toFixed(2)}`);
+        }
+
+        console.log("♔ Advanced Chess Game with AI Learning System Loaded! ♛");
+        console.log("Features: Fixed castling, AI memory, GitHub sync, enhanced evaluation");
     </script>
 </body>
 </html>
