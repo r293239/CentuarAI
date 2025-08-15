@@ -4,7 +4,7 @@
     <script src="chess-ai-database.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Centuar AI</title>
+    <title>Chess Game with AI</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -254,10 +254,10 @@
 
         <div class="ai-info" id="ai-info">
             AI Games Played: <span id="games-played">0</span> | 
-            Win Rate: <span id="win-rate">0%</span>
+            Win Rate: <span id="win-rate">50%</span>
         </div>
         
-        <div class="sync-status" id="sync-status">Ready to sync</div>
+        <div class="sync-status" id="sync-status">Ready</div>
         
         <div class="evaluation" id="evaluation">Position evaluation: 0.00</div>
         
@@ -279,6 +279,9 @@
     </div>
 
     <script>
+        // Initialize enhanced AI system
+        let enhancedAI = null;
+
         // Chess board representation
         let board = [
             ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'],
@@ -298,7 +301,7 @@
         let gameOver = false;
         let gameMode = 'ai';
         let humanPlayer = 'white';
-        const aiDepth = 6;
+        const aiDepth = 4;
         let moveCount = 1;
         let halfMoveCount = 0;
         let lastMove = null;
@@ -337,6 +340,56 @@
             '♟': 100, '♞': 320, '♝': 330, '♜': 500, '♛': 900, '♚': 20000,
             '': 0
         };
+
+        // Initialize on page load
+        window.addEventListener('load', function() {
+            if (typeof ChessAILearner !== 'undefined') {
+                enhancedAI = new ChessAILearner();
+                loadGameHistory();
+                console.log("Enhanced AI learning system loaded!");
+            } else {
+                console.log("ChessAILearner not found, using basic AI");
+            }
+            
+            createBoard();
+            updateStatus();
+            updateEvaluation();
+            updateAIStats();
+            changeGameMode();
+            
+            console.log("♔ Chess Game Loaded! ♛");
+        });
+
+        // Load game history from JSON file
+        async function loadGameHistory() {
+            try {
+                const response = await fetch('ai-game-history.json');
+                const data = await response.json();
+                if (data.learningData && enhancedAI) {
+                    enhancedAI.importLearningData(data.learningData);
+                    updateAIStatsDisplay(data);
+                }
+            } catch (e) {
+                console.log("No previous game history found, starting fresh");
+            }
+        }
+
+        // Save game to history
+        function saveGameToHistory(gameData) {
+            try {
+                // Use memory storage for demo purposes
+                const history = JSON.parse(sessionStorage.getItem('chess_ai_history') || '{"games": []}');
+                history.games.push(gameData);
+                history.metadata = {
+                    ...history.metadata,
+                    lastUpdated: new Date().toISOString(),
+                    totalGames: history.games.length
+                };
+                sessionStorage.setItem('chess_ai_history', JSON.stringify(history));
+            } catch (e) {
+                console.warn("Could not save game history:", e);
+            }
+        }
 
         function createBoard() {
             const boardElement = document.getElementById('chessboard');
@@ -400,7 +453,7 @@
                     updateEvaluation();
                     
                     if (gameMode === 'ai' && !gameOver && currentPlayer !== humanPlayer) {
-                        setTimeout(makeAIMove, 200);
+                        setTimeout(makeAIMove, 500);
                     }
                 } else {
                     if (piece && isPlayerPiece(piece, currentPlayer)) {
@@ -463,7 +516,7 @@
             if (!piece) return false;
             if (targetPiece && isPlayerPiece(targetPiece, currentPlayer)) return false;
             
-            // Fixed castling validation
+            // Castling
             if ((piece === '♔' || piece === '♚') && Math.abs(toCol - fromCol) === 2 && fromRow === toRow) {
                 return canCastle(fromRow, fromCol, toRow, toCol);
             }
@@ -552,7 +605,6 @@
             const isKingside = toCol > fromCol;
             
             if ((isWhite && fromRow !== 7) || (!isWhite && fromRow !== 0)) return false;
-            if (Math.abs(toCol - fromCol) !== 2) return false;
             
             if (isWhite) {
                 if (isKingside && !castlingRights.whiteKingside) return false;
@@ -754,706 +806,3 @@
                     choice = num;
                 }
             }
-            
-            return pieces[choice];
-        }
-
-        function updateCastlingRights(piece, fromRow, fromCol, toRow, toCol) {
-            if (piece === '♔') {
-                castlingRights.whiteKingside = false;
-                castlingRights.whiteQueenside = false;
-            } else if (piece === '♚') {
-                castlingRights.blackKingside = false;
-                castlingRights.blackQueenside = false;
-            }
-            
-            if (piece === '♖' && fromRow === 7) {
-                if (fromCol === 0) castlingRights.whiteQueenside = false;
-                if (fromCol === 7) castlingRights.whiteKingside = false;
-            }
-            if (piece === '♜' && fromRow === 0) {
-                if (fromCol === 0) castlingRights.blackQueenside = false;
-                if (fromCol === 7) castlingRights.blackKingside = false;
-            }
-            
-            if (toRow === 7 && toCol === 0) castlingRights.whiteQueenside = false;
-            if (toRow === 7 && toCol === 7) castlingRights.whiteKingside = false;
-            if (toRow === 0 && toCol === 0) castlingRights.blackQueenside = false;
-            if (toRow === 0 && toCol === 7) castlingRights.blackKingside = false;
-        }
-
-        function updateHalfMoveClock(piece, capturedPiece) {
-            if ((piece === '♙' || piece === '♟') || capturedPiece) {
-                halfMoveCount = 0;
-            } else {
-                halfMoveCount++;
-            }
-        }
-
-        function recordMoveForAI(piece, fromRow, fromCol, toRow, toCol, capturedPiece) {
-            if (gameMode !== 'ai') return;
-            
-            const positionKey = getBoardHash();
-            const move = { fromRow, fromCol, toRow, toCol };
-            
-            if (moveHistory.length < 20) {
-                const openingKey = moveHistory.join(',');
-                if (!aiMemory.openingBook[openingKey]) {
-                    aiMemory.openingBook[openingKey] = [];
-                }
-                aiMemory.openingBook[openingKey].push(move);
-            }
-            
-            const evaluation = evaluatePosition();
-            aiMemory.positionEvaluations.set(positionKey, evaluation);
-        }
-
-        function getBoardHash() {
-            let hash = '';
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    hash += board[row][col] || '.';
-                }
-            }
-            return hash + currentPlayer;
-        }
-
-        function recordGameResult(result) {
-            aiMemory.gamesPlayed++;
-            
-            if (result === 'win' && humanPlayer !== currentPlayer) {
-                aiMemory.wins++;
-            } else if (result === 'loss' && humanPlayer === currentPlayer) {
-                aiMemory.losses++;
-            } else if (result === 'draw') {
-                aiMemory.draws++;
-            }
-            
-            updateAIStats();
-            scheduleSync();
-        }
-
-        function updateAIStats() {
-            document.getElementById('games-played').textContent = aiMemory.gamesPlayed;
-            const winRate = aiMemory.gamesPlayed > 0 ? 
-                Math.round((aiMemory.wins / aiMemory.gamesPlayed) * 100) : 0;
-            document.getElementById('win-rate').textContent = winRate + '%';
-        }
-
-        function scheduleSync() {
-            // Simple sync without GitHub for now
-            document.getElementById('sync-status').textContent = 'Memory updated';
-        }
-
-        function getMoveNotation(piece, fromRow, fromCol, toRow, toCol, capturedPiece) {
-            const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-            const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
-            
-            const fromSquare = files[fromCol] + ranks[fromRow];
-            const toSquare = files[toCol] + ranks[toRow];
-            
-            if ((piece === '♔' || piece === '♚') && Math.abs(toCol - fromCol) === 2) {
-                return toCol > fromCol ? 'O-O' : 'O-O-O';
-            }
-            
-            let notation = '';
-            
-            if (piece === '♟' || piece === '♙') {
-                if (capturedPiece || (enPassantTarget && toRow === enPassantTarget.row && toCol === enPassantTarget.col)) {
-                    notation = files[fromCol] + 'x' + toSquare;
-                } else {
-                    notation = toSquare;
-                }
-                
-                if ((piece === '♙' && toRow === 0) || (piece === '♟' && toRow === 7)) {
-                    const promotedPiece = board[toRow][toCol];
-                    const promotionSymbol = promotedPiece === '♕' || promotedPiece === '♛' ? 'Q' :
-                                           promotedPiece === '♖' || promotedPiece === '♜' ? 'R' :
-                                           promotedPiece === '♗' || promotedPiece === '♝' ? 'B' : 'N';
-                    notation += '=' + promotionSymbol;
-                }
-            } else {
-                const pieceChar = piece === '♞' || piece === '♘' ? 'N' :
-                                 piece === '♝' || piece === '♗' ? 'B' :
-                                 piece === '♜' || piece === '♖' ? 'R' :
-                                 piece === '♛' || piece === '♕' ? 'Q' :
-                                 piece === '♚' || piece === '♔' ? 'K' : '';
-                
-                notation = pieceChar + (capturedPiece ? 'x' : '') + toSquare;
-            }
-            
-            return notation;
-        }
-
-        function switchPlayer() {
-            currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
-            document.getElementById('current-player').textContent = currentPlayer === 'white' ? 'White' : 'Black';
-            document.getElementById('move-counter').textContent = moveCount;
-        }
-
-        function updateStatus() {
-            const statusElement = document.getElementById('status');
-            const playerName = currentPlayer === 'white' ? 'White' : 'Black';
-            
-            if (isKingInCheck(board, currentPlayer)) {
-                const moves = getAllPossibleMoves(currentPlayer);
-                if (moves.length === 0) {
-                    statusElement.textContent = `Checkmate! ${playerName === 'White' ? 'Black' : 'White'} wins!`;
-                    statusElement.style.backgroundColor = '#ffcccb';
-                    gameOver = true;
-                    recordGameResult(playerName === 'White' ? 'loss' : 'win');
-                } else {
-                    statusElement.textContent = `${playerName} is in check!`;
-                    statusElement.style.backgroundColor = '#ffe4b5';
-                }
-            } else {
-                const moves = getAllPossibleMoves(currentPlayer);
-                if (moves.length === 0) {
-                    statusElement.textContent = 'Stalemate! It\'s a draw!';
-                    statusElement.style.backgroundColor = '#e6e6fa';
-                    gameOver = true;
-                    recordGameResult('draw');
-                } else if (halfMoveCount >= 100) {
-                    statusElement.textContent = '50-move rule! It\'s a draw!';
-                    statusElement.style.backgroundColor = '#e6e6fa';
-                    gameOver = true;
-                    recordGameResult('draw');
-                } else if (isInsufficientMaterial()) {
-                    statusElement.textContent = 'Insufficient material! It\'s a draw!';
-                    statusElement.style.backgroundColor = '#e6e6fa';
-                    gameOver = true;
-                    recordGameResult('draw');
-                } else {
-                    statusElement.textContent = `${playerName} to move`;
-                    statusElement.style.backgroundColor = '#f9f9f9';
-                }
-            }
-        }
-
-        function getAllPossibleMoves(player) {
-            const moves = [];
-            for (let fromRow = 0; fromRow < 8; fromRow++) {
-                for (let fromCol = 0; fromCol < 8; fromCol++) {
-                    const piece = board[fromRow][fromCol];
-                    if (piece && isPlayerPiece(piece, player)) {
-                        for (let toRow = 0; toRow < 8; toRow++) {
-                            for (let toCol = 0; toCol < 8; toCol++) {
-                                const oldPlayer = currentPlayer;
-                                currentPlayer = player;
-                                if (isValidMove(fromRow, fromCol, toRow, toCol)) {
-                                    moves.push({ fromRow, fromCol, toRow, toCol });
-                                }
-                                currentPlayer = oldPlayer;
-                            }
-                        }
-                    }
-                }
-            }
-            return moves;
-        }
-
-        function isInsufficientMaterial() {
-            const pieces = [];
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    const piece = board[row][col];
-                    if (piece && piece !== '♔' && piece !== '♚') {
-                        pieces.push(piece);
-                    }
-                }
-            }
-            
-            if (pieces.length === 0) return true;
-            
-            if (pieces.length === 1) {
-                const piece = pieces[0];
-                return piece === '♗' || piece === '♝' || piece === '♘' || piece === '♞';
-            }
-            
-            if (pieces.length === 2) {
-                const bishops = pieces.filter(p => p === '♗' || p === '♝');
-                if (bishops.length === 2) {
-                    let whiteBishopSquareColor = -1;
-                    let blackBishopSquareColor = -1;
-                    
-                    for (let row = 0; row < 8; row++) {
-                        for (let col = 0; col < 8; col++) {
-                            const piece = board[row][col];
-                            if (piece === '♗') {
-                                whiteBishopSquareColor = (row + col) % 2;
-                            } else if (piece === '♝') {
-                                blackBishopSquareColor = (row + col) % 2;
-                            }
-                        }
-                    }
-                    
-                    return whiteBishopSquareColor === blackBishopSquareColor;
-                }
-            }
-            
-            return false;
-        }
-
-        function updateEvaluation() {
-            if (gameOver) return;
-            
-            const evaluation = evaluatePosition();
-            const evalElement = document.getElementById('evaluation');
-            
-            let displayValue = (evaluation / 100).toFixed(2);
-            let displayText = `Position evaluation: ${displayValue}`;
-            
-            if (Math.abs(evaluation) > 500) {
-                if (evaluation > 0) {
-                    displayText = `White is winning (+${Math.abs(parseFloat(displayValue))})`;
-                } else {
-                    displayText = `Black is winning (+${Math.abs(parseFloat(displayValue))})`;
-                }
-            } else if (Math.abs(evaluation) > 200) {
-                if (evaluation > 0) {
-                    displayText = `White has advantage (+${Math.abs(parseFloat(displayValue))})`;
-                } else {
-                    displayText = `Black has advantage (+${Math.abs(parseFloat(displayValue))})`;
-                }
-            } else if (Math.abs(evaluation) < 50) {
-                displayText = `Position is equal (${displayValue})`;
-            }
-            
-            evalElement.textContent = displayText;
-            
-            if (evaluation > 200) {
-                evalElement.style.backgroundColor = '#e8f5e8';
-            } else if (evaluation < -200) {
-                evalElement.style.backgroundColor = '#ffe8e8';
-            } else {
-                evalElement.style.backgroundColor = '#e8f4fd';
-            }
-        }
-
-        function evaluatePosition() {
-            let score = 0;
-            
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
-                    const piece = board[row][col];
-                    if (piece) {
-                        const value = PIECE_VALUES[piece];
-                        if (isPlayerPiece(piece, 'white')) {
-                            score += value;
-                        } else {
-                            score -= value;
-                        }
-                    }
-                }
-            }
-            
-            const positionKey = getBoardHash();
-            if (aiMemory.positionEvaluations.has(positionKey)) {
-                const memorizedEval = aiMemory.positionEvaluations.get(positionKey);
-                score = (score + memorizedEval) / 2;
-            }
-            
-            return score;
-        }
-
-        function updateMoveHistory() {
-            const moveList = document.getElementById('move-list');
-            let html = '';
-            
-            for (let i = 0; i < moveHistory.length; i += 2) {
-                const moveNumber = Math.floor(i / 2) + 1;
-                const whiteMove = moveHistory[i] || '';
-                const blackMove = moveHistory[i + 1] || '';
-                
-                html += `${moveNumber}. ${whiteMove}`;
-                if (blackMove) {
-                    html += ` ${blackMove}`;
-                }
-                html += '<br>';
-            }
-            
-            moveList.innerHTML = html;
-            moveList.scrollTop = moveList.scrollHeight;
-        }
-
-        function makeAIMove() {
-            if (gameOver || gameMode !== 'ai' || isThinking) return;
-            
-            isThinking = true;
-            document.getElementById('thinking').style.display = 'block';
-            
-            setTimeout(() => {
-                try {
-                    const bestMove = getBestMoveWithLearning(currentPlayer);
-                    
-                    if (bestMove) {
-                        makeMove(bestMove.fromRow, bestMove.fromCol, bestMove.toRow, bestMove.toCol);
-                        switchPlayer();
-                        updateStatus();
-                        updateEvaluation();
-                    }
-                } catch (e) {
-                    console.error("AI error:", e);
-                    const moves = getAllPossibleMoves(currentPlayer);
-                    if (moves.length > 0) {
-                        const randomMove = moves[Math.floor(Math.random() * moves.length)];
-                        makeMove(randomMove.fromRow, randomMove.fromCol, randomMove.toRow, randomMove.toCol);
-                        switchPlayer();
-                        updateStatus();
-                        updateEvaluation();
-                    }
-                }
-                
-                isThinking = false;
-                document.getElementById('thinking').style.display = 'none';
-            }, 100);
-        }
-
-        function getBestMoveWithLearning(player) {
-            if (moveHistory.length < 20) {
-                const openingKey = moveHistory.join(',');
-                if (aiMemory.openingBook[openingKey]) {
-                    const bookMoves = aiMemory.openingBook[openingKey];
-                    const validBookMoves = bookMoves.filter(move => 
-                        isValidMove(move.fromRow, move.fromCol, move.toRow, move.toCol)
-                    );
-                    
-                    if (validBookMoves.length > 0) {
-                        return validBookMoves[Math.floor(Math.random() * validBookMoves.length)];
-                    }
-                }
-            }
-            
-            const moves = getAllPossibleMoves(player);
-            if (moves.length === 0) return null;
-            
-            let bestMove = null;
-            let bestScore = player === 'white' ? -Infinity : Infinity;
-            
-            for (const move of moves) {
-                const score = evaluateMoveWithMinimax(move, aiDepth - 1);
-                
-                if ((player === 'white' && score > bestScore) || 
-                    (player === 'black' && score < bestScore)) {
-                    bestScore = score;
-                    bestMove = move;
-                }
-            }
-            
-            return bestMove;
-        }
-
-        function evaluateMoveWithMinimax(move, depth) {
-            const piece = board[move.fromRow][move.fromCol];
-            const capturedPiece = board[move.toRow][move.toCol];
-            const oldEnPassant = enPassantTarget;
-            
-            board[move.toRow][move.toCol] = piece;
-            board[move.fromRow][move.fromCol] = '';
-            
-            let score;
-            if (depth <= 0) {
-                score = evaluatePosition();
-            } else {
-                score = minimax(depth, currentPlayer === 'white' ? 'black' : 'white', -Infinity, Infinity);
-            }
-            
-            board[move.fromRow][move.fromCol] = piece;
-            board[move.toRow][move.toCol] = capturedPiece;
-            enPassantTarget = oldEnPassant;
-            
-            return score;
-        }
-
-        function minimax(depth, player, alpha, beta) {
-            if (depth <= 0) {
-                return evaluatePosition();
-            }
-            
-            const moves = getAllPossibleMoves(player);
-            if (moves.length === 0) {
-                if (isKingInCheck(board, player)) {
-                    return player === 'white' ? -10000 : 10000;
-                }
-                return 0;
-            }
-            
-            if (player === 'white') {
-                let maxEval = -Infinity;
-                for (const move of moves) {
-                    const piece = board[move.fromRow][move.fromCol];
-                    const capturedPiece = board[move.toRow][move.toCol];
-                    const oldEnPassant = enPassantTarget;
-                    
-                    board[move.toRow][move.toCol] = piece;
-                    board[move.fromRow][move.fromCol] = '';
-                    
-                    const eval = minimax(depth - 1, 'black', alpha, beta);
-                    
-                    board[move.fromRow][move.fromCol] = piece;
-                    board[move.toRow][move.toCol] = capturedPiece;
-                    enPassantTarget = oldEnPassant;
-                    
-                    maxEval = Math.max(maxEval, eval);
-                    alpha = Math.max(alpha, eval);
-                    
-                    if (beta <= alpha) break;
-                }
-                return maxEval;
-            } else {
-                let minEval = Infinity;
-                for (const move of moves) {
-                    const piece = board[move.fromRow][move.fromCol];
-                    const capturedPiece = board[move.toRow][move.toCol];
-                    const oldEnPassant = enPassantTarget;
-                    
-                    board[move.toRow][move.toCol] = piece;
-                    board[move.fromRow][move.fromCol] = '';
-                    
-                    const eval = minimax(depth - 1, 'white', alpha, beta);
-                    
-                    board[move.fromRow][move.fromCol] = piece;
-                    board[move.toRow][move.toCol] = capturedPiece;
-                    enPassantTarget = oldEnPassant;
-                    
-                    minEval = Math.min(minEval, eval);
-                    beta = Math.min(beta, eval);
-                    
-                    if (beta <= alpha) break;
-                }
-                return minEval;
-            }
-        }
-
-        function changeGameMode() {
-            const gameModeSelect = document.getElementById('gameMode');
-            gameMode = gameModeSelect.value;
-            
-            const switchSidesBtn = document.getElementById('switch-sides-btn');
-            const gameModeDisplay = document.getElementById('game-mode-display');
-            const aiInfo = document.getElementById('ai-info');
-            
-            if (gameMode === 'ai') {
-                switchSidesBtn.style.display = 'inline-block';
-                gameModeDisplay.textContent = 'vs AI';
-                aiInfo.style.display = 'block';
-            } else {
-                switchSidesBtn.style.display = 'none';
-                gameModeDisplay.textContent = 'vs Player';
-                aiInfo.style.display = 'none';
-            }
-            
-            if (gameMode === 'player') {
-                document.getElementById('thinking').style.display = 'none';
-                isThinking = false;
-            }
-        }
-
-        function switchSides() {
-            if (gameMode !== 'ai') return;
-            
-            humanPlayer = humanPlayer === 'white' ? 'black' : 'white';
-            clearSelection();
-            
-            if (!gameOver && currentPlayer !== humanPlayer && gameMode === 'ai') {
-                setTimeout(makeAIMove, 300);
-            }
-        }
-
-        function newGame() {
-            board = [
-                ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'],
-                ['♟', '♟', '♟', '♟', '♟', '♟', '♟', '♟'],
-                ['', '', '', '', '', '', '', ''],
-                ['', '', '', '', '', '', '', ''],
-                ['', '', '', '', '', '', '', ''],
-                ['', '', '', '', '', '', '', ''],
-                ['♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙'],
-                ['♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖']
-            ];
-            
-            currentPlayer = 'white';
-            selectedSquare = null;
-            gameHistory = [];
-            moveHistory = [];
-            moveCount = 1;
-            halfMoveCount = 0;
-            gameOver = false;
-            lastMove = null;
-            enPassantTarget = null;
-            isThinking = false;
-            
-            castlingRights = {
-                whiteKingside: true,
-                whiteQueenside: true,
-                blackKingside: true,
-                blackQueenside: true
-            };
-            
-            document.getElementById('current-player').textContent = 'White';
-            document.getElementById('move-counter').textContent = '1';
-            document.getElementById('thinking').style.display = 'none';
-            
-            createBoard();
-            updateStatus();
-            updateEvaluation();
-            updateMoveHistory();
-            
-            if (gameMode === 'ai' && currentPlayer !== humanPlayer) {
-                setTimeout(makeAIMove, 500);
-            }
-        }
-
-        function undoMove() {
-            if (gameHistory.length === 0) return;
-            
-            const lastState = gameHistory.pop();
-            
-            board = lastState.board;
-            currentPlayer = lastState.currentPlayer;
-            moveHistory = lastState.moveHistory;
-            moveCount = lastState.moveCount;
-            halfMoveCount = lastState.halfMoveCount;
-            castlingRights = lastState.castlingRights;
-            lastMove = lastState.lastMove;
-            enPassantTarget = lastState.enPassantTarget;
-            gameOver = false;
-            isThinking = false;
-            
-            document.getElementById('current-player').textContent = currentPlayer === 'white' ? 'White' : 'Black';
-            document.getElementById('move-counter').textContent = moveCount;
-            document.getElementById('thinking').style.display = 'none';
-            
-            clearSelection();
-            createBoard();
-            updateStatus();
-            updateEvaluation();
-            updateMoveHistory();
-        }
-
-        window.onload = function() {
-            createBoard();
-            updateStatus();
-            updateEvaluation();
-            updateAIStats();
-            changeGameMode();
-            
-            console.log("♔ Advanced Chess Game with AI Learning System Loaded! ♛");
-            console.log("Features: Fixed castling, AI memory, enhanced evaluation");
-        };
-    // Initialize enhanced AI system
-let enhancedAI = null;
-
-// Initialize on page load
-window.addEventListener('load', function() {
-    enhancedAI = new ChessAILearner();
-    loadGameHistory();
-    console.log("Enhanced AI learning system loaded!");
-});
-
-// Load game history from JSON file
-async function loadGameHistory() {
-    try {
-        const response = await fetch('ai-game-history.json');
-        const data = await response.json();
-        if (data.learningData) {
-            enhancedAI.importLearningData(data.learningData);
-            updateAIStatsDisplay(data);
-        }
-    } catch (e) {
-        console.log("No previous game history found, starting fresh");
-    }
-}
-
-// Save game to history
-async function saveGameToHistory(gameData) {
-    try {
-        // In a real implementation, this would require a backend
-        // For now, we'll use localStorage as fallback
-        const history = JSON.parse(localStorage.getItem('chess_ai_history') || '{"games": []}');
-        history.games.push(gameData);
-        history.metadata = {
-            ...history.metadata,
-            lastUpdated: new Date().toISOString(),
-            totalGames: history.games.length
-        };
-        localStorage.setItem('chess_ai_history', JSON.stringify(history));
-    } catch (e) {
-        console.warn("Could not save game history:", e);
-    }
-}
-
-// Update your existing recordGameResult function
-const originalRecordGameResult = recordGameResult;
-recordGameResult = function(result) {
-    if (enhancedAI) {
-        const gameData = {
-            id: `game_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            players: {
-                white: humanPlayer === 'white' ? 'Human' : 'AI',
-                black: humanPlayer === 'black' ? 'Human' : 'AI'
-            },
-            result: result,
-            moves: [...moveHistory],
-            gameLength: moveHistory.length,
-            aiDifficulty: 6,
-            opening: detectOpening(moveHistory.slice(0, 6))
-        };
-        
-        enhancedAI.learnFromGame({
-            moves: moveHistory,
-            result: result,
-            playerColors: {
-                ai: humanPlayer === 'white' ? 'black' : 'white',
-                human: humanPlayer
-            }
-        });
-        
-        saveGameToHistory(gameData);
-    }
-    
-    originalRecordGameResult(result);
-};
-
-// Detect opening name (simplified)
-function detectOpening(firstMoves) {
-    const moveString = firstMoves.join(',');
-    for (const [key, opening] of Object.entries(ChessAIDatabase.openingBook)) {
-        if (moveString.startsWith(key)) {
-            return opening.name;
-        }
-    }
-    return "Unknown Opening";
-}
-
-// Enhanced AI move selection
-const originalGetBestMoveWithLearning = getBestMoveWithLearning;
-getBestMoveWithLearning = function(player) {
-    if (enhancedAI && moveHistory.length < 20) {
-        const openingMove = enhancedAI.getOpeningRecommendation(moveHistory);
-        if (openingMove) {
-            console.log(`Using opening book: ${openingMove}`);
-            return parseOpeningMove(openingMove);
-        }
-    }
-    
-    return originalGetBestMoveWithLearning(player);
-};
-
-// Parse opening move notation
-function parseOpeningMove(moveNotation) {
-    const files = { 'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7 };
-    const ranks = { '8': 0, '7': 1, '6': 2, '5': 3, '4': 4, '3': 5, '2': 6, '1': 7 };
-    
-    const [from, to] = moveNotation.split('-');
-    return {
-        fromRow: ranks[from[1]],
-        fromCol: files[from[0]],
-        toRow: ranks[to[1]],
-        toCol: files[to[0]]
-    };
-}
-    </script>
-</body>
-</html>
