@@ -1341,6 +1341,119 @@
             console.log("♔ Advanced Chess Game with AI Learning System Loaded! ♛");
             console.log("Features: Fixed castling, AI memory, enhanced evaluation");
         };
+    // Initialize enhanced AI system
+let enhancedAI = null;
+
+// Initialize on page load
+window.addEventListener('load', function() {
+    enhancedAI = new ChessAILearner();
+    loadGameHistory();
+    console.log("Enhanced AI learning system loaded!");
+});
+
+// Load game history from JSON file
+async function loadGameHistory() {
+    try {
+        const response = await fetch('ai-game-history.json');
+        const data = await response.json();
+        if (data.learningData) {
+            enhancedAI.importLearningData(data.learningData);
+            updateAIStatsDisplay(data);
+        }
+    } catch (e) {
+        console.log("No previous game history found, starting fresh");
+    }
+}
+
+// Save game to history
+async function saveGameToHistory(gameData) {
+    try {
+        // In a real implementation, this would require a backend
+        // For now, we'll use localStorage as fallback
+        const history = JSON.parse(localStorage.getItem('chess_ai_history') || '{"games": []}');
+        history.games.push(gameData);
+        history.metadata = {
+            ...history.metadata,
+            lastUpdated: new Date().toISOString(),
+            totalGames: history.games.length
+        };
+        localStorage.setItem('chess_ai_history', JSON.stringify(history));
+    } catch (e) {
+        console.warn("Could not save game history:", e);
+    }
+}
+
+// Update your existing recordGameResult function
+const originalRecordGameResult = recordGameResult;
+recordGameResult = function(result) {
+    if (enhancedAI) {
+        const gameData = {
+            id: `game_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            players: {
+                white: humanPlayer === 'white' ? 'Human' : 'AI',
+                black: humanPlayer === 'black' ? 'Human' : 'AI'
+            },
+            result: result,
+            moves: [...moveHistory],
+            gameLength: moveHistory.length,
+            aiDifficulty: 6,
+            opening: detectOpening(moveHistory.slice(0, 6))
+        };
+        
+        enhancedAI.learnFromGame({
+            moves: moveHistory,
+            result: result,
+            playerColors: {
+                ai: humanPlayer === 'white' ? 'black' : 'white',
+                human: humanPlayer
+            }
+        });
+        
+        saveGameToHistory(gameData);
+    }
+    
+    originalRecordGameResult(result);
+};
+
+// Detect opening name (simplified)
+function detectOpening(firstMoves) {
+    const moveString = firstMoves.join(',');
+    for (const [key, opening] of Object.entries(ChessAIDatabase.openingBook)) {
+        if (moveString.startsWith(key)) {
+            return opening.name;
+        }
+    }
+    return "Unknown Opening";
+}
+
+// Enhanced AI move selection
+const originalGetBestMoveWithLearning = getBestMoveWithLearning;
+getBestMoveWithLearning = function(player) {
+    if (enhancedAI && moveHistory.length < 20) {
+        const openingMove = enhancedAI.getOpeningRecommendation(moveHistory);
+        if (openingMove) {
+            console.log(`Using opening book: ${openingMove}`);
+            return parseOpeningMove(openingMove);
+        }
+    }
+    
+    return originalGetBestMoveWithLearning(player);
+};
+
+// Parse opening move notation
+function parseOpeningMove(moveNotation) {
+    const files = { 'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5, 'g': 6, 'h': 7 };
+    const ranks = { '8': 0, '7': 1, '6': 2, '5': 3, '4': 4, '3': 5, '2': 6, '1': 7 };
+    
+    const [from, to] = moveNotation.split('-');
+    return {
+        fromRow: ranks[from[1]],
+        fromCol: files[from[0]],
+        toRow: ranks[to[1]],
+        toCol: files[to[0]]
+    };
+}
     </script>
 </body>
 </html>
