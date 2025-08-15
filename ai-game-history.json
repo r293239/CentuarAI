@@ -13,7 +13,7 @@
     "openingStats": {},
     "patternRecognition": {},
     "winRate": 50,
-    "currentDifficulty": 6,
+    "currentDifficulty": 4,
     "adaptiveLearning": true
   },
   "games": [],
@@ -69,7 +69,7 @@
       ],
       "opening": "Ruy Lopez",
       "gameLength": 32,
-      "aiDifficulty": 6,
+      "aiDifficulty": 4,
       "endgameType": "middlegame_draw",
       "keyMoments": [
         {
@@ -94,7 +94,7 @@
   "difficultyHistory": [
     {
       "timestamp": "2024-01-01T00:00:00Z",
-      "difficulty": 6,
+      "difficulty": 4,
       "reason": "initial_setting"
     }
   ],
