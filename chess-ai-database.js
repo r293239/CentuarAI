@@ -496,15 +496,3 @@ class ChessAILearner {
         console.log('🔄 AI data reset');
     }
 }
-
-// ========== REST OF chess-game.js with SMART AI ==========
-
-// Note: The rest of chess-game.js remains the same as the previous version
-// with the enhanced AI functions that prioritize:
-// 1. Position evaluation with piece-square tables
-// 2. Mobility calculation
-// 3. King safety
-// 4. Center control
-// 5. Development bonus
-// 6. Endgame knowledge
-// 7. Safety checks for all moves
