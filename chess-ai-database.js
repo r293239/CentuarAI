@@ -1,99 +1,332 @@
 // chess-ai-database.js
-// Enhanced chess AI with learning capabilities and professional opening book
+// Enhanced chess AI with extended professional opening book (3 moves deep)
 
 class ChessAILearner {
     constructor() {
         this.performanceHistory = [];
         this.openingBook = this.initializeOpeningBook();
         this.positionEvaluations = new Map();
-        this.learningRate = 0.1;
-        this.difficulty = 4; // Default difficulty
-        this.adaptiveLearning = true;
+        this.difficulty = 6; // Maximum difficulty
         this.endgameDatabase = this.initializeEndgameDatabase();
         
-        console.log("🧠 Enhanced Chess AI initialized with professional opening book");
+        console.log("🧠 Enhanced Chess AI initialized at MAXIMUM STRENGTH with extended opening book");
     }
 
     initializeOpeningBook() {
         return {
-            // Opening responses based on algebraic notation (from-to format without dashes)
+            // ========== WHITE'S FIRST MOVES ==========
             'e2e4': {
+                // Against e5 (Open Games)
                 'e7e5': {
-                    moves: ['g1f3', 'f1c4', 'f1b5', 'd2d3'],
-                    weights: [35, 30, 25, 10]
+                    moves: ['g1f3', 'f1c4', 'f1b5'],
+                    weights: [45, 30, 25],
+                    // Extended book - responses to Black's moves after 2. Nf3
+                    'after_g1f3': {
+                        'b8c6': { // Two Knights Defense / Italian
+                            moves: ['f1c4', 'f1b5', 'd2d4'],
+                            weights: [45, 35, 20]
+                        },
+                        'g8f6': { // Petroff Defense
+                            moves: ['g1e5', 'd2d4', 'b1c3'],
+                            weights: [40, 35, 25]
+                        },
+                        'd7d6': { // Philidor Defense
+                            moves: ['d2d4', 'b1c3', 'f1c4'],
+                            weights: [45, 30, 25]
+                        },
+                        'f7f6': { // Damiano Defense (bad)
+                            moves: ['g1e5', 'd2d4', 'f1c4'],
+                            weights: [80, 15, 5]
+                        }
+                    },
+                    // After 2. Bc4 (Italian Game)
+                    'after_f1c4': {
+                        'g8f6': { // Two Knights Defense
+                            moves: ['g1f3', 'd2d4', 'e4e5'],
+                            weights: [40, 35, 25]
+                        },
+                        'f8c5': { // Giuoco Piano
+                            moves: ['g1f3', 'd2d3', 'c2c3'],
+                            weights: [45, 30, 25]
+                        },
+                        'b8c6': { // Italian Game main line
+                            moves: ['g1f3', 'd2d3', 'b1c3'],
+                            weights: [50, 30, 20]
+                        }
+                    },
+                    // After 2. Bb5 (Ruy Lopez)
+                    'after_f1b5': {
+                        'a7a6': { // Morphy Defense
+                            moves: ['b5a4', 'b5c6', 'g1f3'],
+                            weights: [50, 30, 20]
+                        },
+                        'b8c6': { // Berlin Defense
+                            moves: ['b1c3', 'g1f3', 'd2d4'],
+                            weights: [40, 35, 25]
+                        },
+                        'g8f6': { // Berlin with Nf6
+                            moves: ['e4e5', 'd2d4', 'b1c3'],
+                            weights: [45, 30, 25]
+                        }
+                    }
                 },
-                'c7c5': { // Sicilian Defense
-                    moves: ['g1f3', 'd2d4', 'b1c3', 'f2f4'],
-                    weights: [50, 30, 15, 5]
+                // Against c5 (Sicilian Defense)
+                'c7c5': {
+                    moves: ['g1f3', 'd2d4', 'b1c3'],
+                    weights: [50, 35, 15],
+                    'after_g1f3': {
+                        'd7d6': { // Najdorf / Classical
+                            moves: ['d2d4', 'b1c3', 'f1b5'],
+                            weights: [50, 30, 20]
+                        },
+                        'e7e6': { // Scheveningen / Kan
+                            moves: ['d2d4', 'b1c3', 'f1d3'],
+                            weights: [45, 35, 20]
+                        },
+                        'b8c6': { // Classical Sicilian
+                            moves: ['d2d4', 'b1c3', 'f1b5'],
+                            weights: [45, 30, 25]
+                        },
+                        'g8f6': { // Nimzowitsch Sicilian
+                            moves: ['b1c3', 'e4e5', 'd2d4'],
+                            weights: [40, 35, 25]
+                        }
+                    },
+                    'after_d2d4': {
+                        'c5d4': {
+                            moves: ['g1f3', 'f1c4', 'b1c3'],
+                            weights: [50, 30, 20]
+                        }
+                    }
                 },
-                'e7e6': { // French Defense
-                    moves: ['d2d4', 'g1f3', 'b1d2', 'f1d3'],
-                    weights: [40, 30, 20, 10]
+                // Against e6 (French Defense)
+                'e7e6': {
+                    moves: ['d2d4', 'b1c3', 'b1d2'],
+                    weights: [45, 30, 25],
+                    'after_d2d4': {
+                        'd7d5': { // Main French
+                            moves: ['b1c3', 'e4e5', 'g1f3'],
+                            weights: [45, 35, 20],
+                            'after_b1c3': {
+                                'g8f6': { // Classical French
+                                    moves: ['e4e5', 'g1f3', 'c1g5'],
+                                    weights: [45, 30, 25]
+                                },
+                                'f8b4': { // Winawer French
+                                    moves: ['e4e5', 'c1d2', 'd4c5'],
+                                    weights: [40, 35, 25]
+                                },
+                                'd5e4': { // Rubinstein French
+                                    moves: ['c3e4', 'g1f3', 'c1g5'],
+                                    weights: [50, 30, 20]
+                                }
+                            }
+                        },
+                        'c7c5': { // French with early c5
+                            moves: ['g1f3', 'b1c3', 'c2c3'],
+                            weights: [40, 35, 25]
+                        }
+                    }
                 },
-                'c7c6': { // Caro-Kann Defense
-                    moves: ['d2d4', 'g1f3', 'b1d2'],
-                    weights: [40, 35, 25]
+                // Against c6 (Caro-Kann Defense)
+                'c7c6': {
+                    moves: ['d2d4', 'b1c3', 'g1f3'],
+                    weights: [40, 35, 25],
+                    'after_d2d4': {
+                        'd7d5': {
+                            moves: ['b1c3', 'e4e5', 'g1f3'],
+                            weights: [45, 35, 20],
+                            'after_b1c3': {
+                                'd5e4': { // Classical Caro-Kann
+                                    moves: ['c3e4', 'g1f3', 'c1f4'],
+                                    weights: [45, 35, 20]
+                                },
+                                'g8f6': { // Two Knights Caro-Kann
+                                    moves: ['e4e5', 'c1g5', 'g1f3'],
+                                    weights: [40, 35, 25]
+                                }
+                            }
+                        }
+                    }
                 },
-                'd7d6': { // Pirc Defense
-                    moves: ['d2d4', 'g1f3', 'b1c3'],
-                    weights: [40, 35, 25]
-                },
-                'g8f6': { // Alekhine's Defense
-                    moves: ['e4e5', 'b1c3', 'd2d4'],
-                    weights: [45, 30, 25]
-                },
-                'd7d5': { // Scandinavian Defense
-                    moves: ['e4d5', 'g1f3'],
-                    weights: [70, 30]
+                // Against d5 (Scandinavian Defense)
+                'd7d5': {
+                    moves: ['e4d5', 'g1f3', 'd2d4'],
+                    weights: [70, 20, 10],
+                    'after_e4d5': {
+                        'd8d5': {
+                            moves: ['b1c3', 'g1f3', 'd2d4'],
+                            weights: [50, 30, 20]
+                        },
+                        'g8f6': { // Modern Scandinavian
+                            moves: ['d2d4', 'c2c4', 'g1f3'],
+                            weights: [45, 35, 20]
+                        }
+                    }
                 }
             },
 
+            // ========== d4 OPENINGS ==========
             'd2d4': {
+                // Against d5 (Queen's Pawn Games)
                 'd7d5': {
                     moves: ['c2c4', 'g1f3', 'b1c3'],
-                    weights: [45, 30, 25]
+                    weights: [50, 30, 20],
+                    'after_c2c4': {
+                        'e7e6': { // Queen's Gambit Declined
+                            moves: ['b1c3', 'g1f3', 'c1g5'],
+                            weights: [45, 35, 20],
+                            'after_b1c3': {
+                                'g8f6': { // Classical QGD
+                                    moves: ['c1g5', 'g1f3', 'e2e3'],
+                                    weights: [45, 30, 25]
+                                },
+                                'f8b4': { // Ragozin / Vienna
+                                    moves: ['c1g5', 'g1f3', 'e2e3'],
+                                    weights: [40, 35, 25]
+                                }
+                            }
+                        },
+                        'c7c6': { // Slav Defense
+                            moves: ['g1f3', 'b1c3', 'c1f4'],
+                            weights: [45, 35, 20],
+                            'after_g1f3': {
+                                'g8f6': { // Main Slav
+                                    moves: ['b1c3', 'c1f4', 'e2e3'],
+                                    weights: [45, 30, 25]
+                                }
+                            }
+                        },
+                        'd5c4': { // Queen's Gambit Accepted
+                            moves: ['e2e3', 'g1f3', 'f1c4'],
+                            weights: [45, 35, 20]
+                        }
+                    }
                 },
+                // Against Nf6 (Indian Defenses)
                 'g8f6': {
                     moves: ['c2c4', 'g1f3', 'b1c3'],
-                    weights: [40, 35, 25]
+                    weights: [45, 35, 20],
+                    'after_c2c4': {
+                        'e7e6': { // Nimzo-Indian / Queen's Indian
+                            moves: ['b1c3', 'g1f3', 'e2e3'],
+                            weights: [45, 35, 20],
+                            'after_b1c3': {
+                                'f8b4': { // Nimzo-Indian Defense
+                                    moves: ['e2e3', 'g1f3', 'c1d2'],
+                                    weights: [45, 35, 20]
+                                }
+                            }
+                        },
+                        'g7g6': { // King's Indian Defense
+                            moves: ['b1c3', 'g1f3', 'e2e4'],
+                            weights: [45, 35, 20],
+                            'after_b1c3': {
+                                'f8g7': { // Main KID
+                                    moves: ['e2e4', 'g1f3', 'c1e3'],
+                                    weights: [45, 30, 25]
+                                }
+                            }
+                        },
+                        'c7c5': { // Benoni Defense
+                            moves: ['d4d5', 'b1c3', 'e2e4'],
+                            weights: [50, 30, 20]
+                        }
+                    }
                 },
+                // Against e6 (Queen's Indian / Dutch)
                 'e7e6': {
                     moves: ['c2c4', 'g1f3', 'b1c3'],
-                    weights: [40, 30, 30]
+                    weights: [45, 35, 20],
+                    'after_c2c4': {
+                        'g8f6': { // Queen's Indian / Nimzo-Indian
+                            moves: ['b1c3', 'g1f3', 'e2e3'],
+                            weights: [45, 35, 20]
+                        },
+                        'f8b4': { // Nimzo-Indian
+                            moves: ['b1c3', 'e2e3', 'g1f3'],
+                            weights: [45, 35, 20]
+                        }
+                    }
                 },
+                // Against c5 (Benoni / Symmetrical)
                 'c7c5': {
-                    moves: ['d4d5', 'g1f3', 'c2c4'],
-                    weights: [40, 35, 25]
+                    moves: ['d4d5', 'c2c4', 'b1c3'],
+                    weights: [50, 30, 20],
+                    'after_d4d5': {
+                        'e7e6': { // Modern Benoni
+                            moves: ['b1c3', 'c2c4', 'g1f3'],
+                            weights: [45, 35, 20]
+                        },
+                        'd7d6': { // Old Benoni
+                            moves: ['b1c3', 'e2e4', 'g1f3'],
+                            weights: [45, 35, 20]
+                        }
+                    }
                 }
             },
 
+            // ========== Nf3 OPENINGS ==========
             'g1f3': {
                 'd7d5': {
-                    moves: ['c2c4', 'g2g3', 'd2d4'],
-                    weights: [40, 35, 25]
+                    moves: ['d2d4', 'c2c4', 'g2g3'],
+                    weights: [45, 35, 20],
+                    'after_d2d4': {
+                        'g8f6': { // Queen's Indian setup
+                            moves: ['c2c4', 'b1c3', 'g2g3'],
+                            weights: [45, 35, 20]
+                        },
+                        'c7c5': { // Symmetrical English
+                            moves: ['c2c4', 'b1c3', 'e2e3'],
+                            weights: [40, 35, 25]
+                        }
+                    }
                 },
                 'g8f6': {
-                    moves: ['c2c4', 'g2g3', 'd2d4'],
-                    weights: [35, 35, 30]
-                },
-                'e7e6': {
-                    moves: ['c2c4', 'd2d4', 'g2g3'],
-                    weights: [40, 30, 30]
+                    moves: ['d2d4', 'c2c4', 'g2g3'],
+                    weights: [45, 35, 20],
+                    'after_d2d4': {
+                        'e7e6': { // Queen's Indian setup
+                            moves: ['c2c4', 'b1c3', 'g2g3'],
+                            weights: [45, 35, 20]
+                        },
+                        'g7g6': { // King's Indian / Grunfeld
+                            moves: ['d2d4', 'c2c4', 'g2g3'],
+                            weights: [45, 35, 20]
+                        }
+                    }
                 }
             },
 
+            // ========== c4 OPENINGS (English) ==========
             'c2c4': {
                 'e7e5': {
                     moves: ['b1c3', 'g1f3', 'g2g3'],
-                    weights: [40, 35, 25]
+                    weights: [45, 35, 20],
+                    'after_b1c3': {
+                        'g8f6': { // English Opening main line
+                            moves: ['g1f3', 'g2g3', 'f1g2'],
+                            weights: [45, 35, 20]
+                        },
+                        'f8b4': { // English with ...Bb4
+                            moves: ['g1f3', 'e2e3', 'd2d4'],
+                            weights: [40, 35, 25]
+                        }
+                    }
                 },
                 'g8f6': {
                     moves: ['b1c3', 'g1f3', 'g2g3'],
-                    weights: [35, 40, 25]
-                },
-                'c7c5': {
-                    moves: ['b1c3', 'g1f3', 'g2g3'],
-                    weights: [40, 35, 25]
+                    weights: [45, 35, 20],
+                    'after_b1c3': {
+                        'e7e5': { // Symmetrical English
+                            moves: ['g1f3', 'g2g3', 'f1g2'],
+                            weights: [45, 35, 20]
+                        },
+                        'c7c5': { // Symmetrical English
+                            moves: ['g1f3', 'g2g3', 'f1g2'],
+                            weights: [45, 35, 20]
+                        }
+                    }
                 }
             }
         };
@@ -120,9 +353,9 @@ class ChessAILearner {
 
     getOpeningRecommendation(moveHistory) {
         if (moveHistory.length === 0) {
-            // First move recommendations
-            const firstMoves = ['e2e4', 'd2d4', 'g1f3', 'c2c4'];
-            const weights = [35, 35, 20, 10];
+            // First move - choose strongest opening
+            const firstMoves = ['e2e4', 'd2d4'];
+            const weights = [55, 45];
             return this.weightedRandomChoice(firstMoves, weights);
         }
 
@@ -135,17 +368,51 @@ class ChessAILearner {
             }
         }
 
+        // Try to find extended book lines (3 moves deep)
         if (moveHistory.length >= 2) {
-            const whiteMove = moveHistory[moveHistory.length - 2];
-            const blackMove = moveHistory[moveHistory.length - 1];
+            const move1 = moveHistory[moveHistory.length - 2];
+            const move2 = moveHistory[moveHistory.length - 1];
             
-            if (this.openingBook[whiteMove] && this.openingBook[whiteMove][blackMove]) {
-                const data = this.openingBook[whiteMove][blackMove];
-                return this.weightedRandomChoice(data.moves, data.weights);
+            // Check for extended book after specific sequences
+            if (this.openingBook[move1] && 
+                this.openingBook[move1][move2] && 
+                this.openingBook[move1][move2]['after_' + move1]) {
+                const afterKey = 'after_' + move1;
+                const subBook = this.openingBook[move1][move2][afterKey];
+                if (subBook && moveHistory.length >= 3) {
+                    const move3 = moveHistory[moveHistory.length - 3];
+                    if (subBook[move3]) {
+                        return this.weightedRandomChoice(
+                            subBook[move3].moves, 
+                            subBook[move3].weights
+                        );
+                    }
+                }
+                if (subBook) {
+                    const responses = Object.keys(subBook);
+                    if (responses.length > 0) {
+                        const weights = responses.map(() => 1);
+                        const response = this.weightedRandomChoice(responses, weights);
+                        if (subBook[response]) {
+                            return this.weightedRandomChoice(
+                                subBook[response].moves,
+                                subBook[response].weights
+                            );
+                        }
+                    }
+                }
+            }
+            
+            // Standard two-move book
+            if (this.openingBook[move1] && this.openingBook[move1][move2]) {
+                const data = this.openingBook[move1][move2];
+                if (data.moves) {
+                    return this.weightedRandomChoice(data.moves, data.weights);
+                }
             }
         }
 
-        return null; // No opening recommendation
+        return null;
     }
 
     weightedRandomChoice(choices, weights) {
@@ -162,135 +429,23 @@ class ChessAILearner {
     }
 
     learnFromGame(gameData) {
-        if (!this.adaptiveLearning) return;
-
-        this.performanceHistory.push({
-            timestamp: Date.now(),
-            result: gameData.result,
-            difficulty: this.difficulty,
-            playerColors: gameData.playerColors,
-            moves: gameData.moves,
-            gameLength: gameData.moves ? gameData.moves.length : 0
-        });
-
-        this.adjustDifficultyBasedOnPerformance();
-        this.learnFromOpening(gameData.moves, gameData.result);
-        this.updatePositionEvaluations(gameData);
-
-        console.log(`🎓 AI learned from game. New difficulty: ${this.difficulty}`);
-    }
-
-    adjustDifficultyBasedOnPerformance() {
-        const recentGames = this.performanceHistory.slice(-10);
-        if (recentGames.length < 5) return;
-
-        const wins = recentGames.filter(game => game.result === 'win').length;
-        const winRate = wins / recentGames.length;
-
-        if (winRate > 0.7) {
-            this.difficulty = Math.min(6, this.difficulty + 1);
-        } else if (winRate < 0.3) {
-            this.difficulty = Math.max(2, this.difficulty - 1);
-        }
-
-        // Add randomness to prevent predictability
-        if (Math.random() < 0.1) {
-            this.difficulty += Math.random() < 0.5 ? -1 : 1;
-            this.difficulty = Math.max(2, Math.min(6, this.difficulty));
-        }
-    }
-
-    learnFromOpening(moves, result) {
-        if (!moves || moves.length < 6) return;
-
-        const opening = moves.slice(0, 6).join('_');
-        if (!this.positionEvaluations.has(opening)) {
-            this.positionEvaluations.set(opening, { games: 0, score: 0 });
-        }
-
-        const data = this.positionEvaluations.get(opening);
-        data.games++;
-        
-        if (result === 'win') {
-            data.score += 1;
-        } else if (result === 'draw') {
-            data.score += 0.5;
-        }
-        
-        // If this opening performs poorly, adjust weights
-        if (data.games >= 5 && (data.score / data.games) < 0.3) {
-            this.adjustOpeningWeights(moves[0], moves[1], -0.1);
-        }
-    }
-
-    adjustOpeningWeights(firstMove, response, adjustment) {
-        if (this.openingBook[firstMove] && this.openingBook[firstMove][response]) {
-            const data = this.openingBook[firstMove][response];
-            for (let i = 0; i < data.weights.length; i++) {
-                data.weights[i] = Math.max(1, data.weights[i] + adjustment);
-            }
-        }
-    }
-
-    updatePositionEvaluations(gameData) {
-        if (!gameData.moves) return;
-        
-        const criticalMoves = this.identifyCriticalMoves(gameData.moves);
-        
-        criticalMoves.forEach(moveIndex => {
-            const position = gameData.moves.slice(0, moveIndex).join('_');
-            if (!this.positionEvaluations.has(position)) {
-                this.positionEvaluations.set(position, { games: 0, score: 0 });
-            }
-            
-            const data = this.positionEvaluations.get(position);
-            data.games++;
-            
-            if (gameData.result === 'win') {
-                data.score += 1;
-            } else if (gameData.result === 'draw') {
-                data.score += 0.5;
-            }
-        });
-    }
-
-    identifyCriticalMoves(moves) {
-        const critical = [];
-        for (let i = 10; i < Math.min(30, moves.length); i += 2) {
-            critical.push(i);
-        }
-        return critical;
+        // Learning disabled for maximum strength
+        return;
     }
 
     adjustDifficulty() {
-        const variation = Math.floor(Math.random() * 3) - 1;
-        return Math.max(2, Math.min(6, this.difficulty + variation));
+        return 6; // Always maximum
     }
 
     getWinRate() {
         if (this.performanceHistory.length === 0) return 50;
-        
         const wins = this.performanceHistory.filter(game => game.result === 'win').length;
         const draws = this.performanceHistory.filter(game => game.result === 'draw').length;
-        
         return Math.round(((wins + draws * 0.5) / this.performanceHistory.length) * 100);
     }
 
     getOpeningStatistics() {
-        const stats = {};
-        this.performanceHistory.forEach(game => {
-            if (game.moves && game.moves.length >= 2) {
-                const opening = game.moves.slice(0, 2).join(' ');
-                if (!stats[opening]) {
-                    stats[opening] = { games: 0, wins: 0, draws: 0 };
-                }
-                stats[opening].games++;
-                if (game.result === 'win') stats[opening].wins++;
-                if (game.result === 'draw') stats[opening].draws++;
-            }
-        });
-        
-        return stats;
+        return {};
     }
 
     exportLearningData() {
@@ -298,9 +453,7 @@ class ChessAILearner {
             performanceHistory: this.performanceHistory,
             difficulty: this.difficulty,
             winRate: this.getWinRate(),
-            gamesPlayed: this.performanceHistory.length,
-            positionEvaluations: Array.from(this.positionEvaluations.entries()),
-            openingStats: this.getOpeningStatistics()
+            gamesPlayed: this.performanceHistory.length
         };
     }
 
@@ -308,72 +461,50 @@ class ChessAILearner {
         if (data.performanceHistory) {
             this.performanceHistory = data.performanceHistory;
         }
-        if (data.difficulty) {
-            this.difficulty = data.difficulty;
-        }
-        if (data.positionEvaluations) {
-            this.positionEvaluations = new Map(data.positionEvaluations);
-        }
-        
-        console.log(`🔄 Imported learning data: ${this.performanceHistory.length} games, difficulty ${this.difficulty}`);
+        console.log(`🔄 Imported data: ${this.performanceHistory.length} games`);
     }
 
     analyzeOpening(moves) {
-        if (!moves || moves.length < 6) return null;
+        if (!moves || moves.length < 2) return null;
         
-        const openingMoves = moves.slice(0, 6);
+        const openingMoves = moves.slice(0, Math.min(6, moves.length));
         const openingString = openingMoves.join(' ');
         
-        // Basic opening classification
-        if (openingString.includes('e2e4 e7e5 g1f3')) {
-            if (openingString.includes('f1b5')) return 'Ruy Lopez';
-            if (openingString.includes('f1c4')) return 'Italian Game';
-            if (openingString.includes('d2d4')) return 'Scotch Game';
-        }
+        // Extended opening classification
+        if (openingString.includes('e2e4 e7e5 g1f3 b8c6 f1c4')) return 'Italian Game';
+        if (openingString.includes('e2e4 e7e5 g1f3 b8c6 f1b5')) return 'Ruy Lopez';
+        if (openingString.includes('e2e4 e7e5 g1f3 g8f6')) return 'Petroff Defense';
+        if (openingString.includes('e2e4 c7c5 g1f3 d7d6 d2d4')) return 'Sicilian Najdorf';
+        if (openingString.includes('e2e4 c7c5 g1f3 e7e6 d2d4')) return 'Sicilian Scheveningen';
+        if (openingString.includes('e2e4 e7e6 d2d4 d7d5 b1c3')) return 'French Defense';
+        if (openingString.includes('e2e4 c7c6 d2d4 d7d5 b1c3')) return 'Caro-Kann Defense';
+        if (openingString.includes('d2d4 d7d5 c2c4 e7e6 b1c3')) return 'Queen\'s Gambit Declined';
+        if (openingString.includes('d2d4 d7d5 c2c4 c7c6')) return 'Slav Defense';
+        if (openingString.includes('d2d4 g8f6 c2c4 e7e6 b1c3 f8b4')) return 'Nimzo-Indian Defense';
+        if (openingString.includes('d2d4 g8f6 c2c4 g7g6 b1c3')) return 'King\'s Indian Defense';
         
-        if (openingString.includes('d2d4 d7d5')) {
-            if (openingString.includes('c2c4')) return 'Queen\'s Gambit';
-            if (openingString.includes('g1f3')) return 'London System';
-        }
-        
-        if (openingString.includes('e2e4 c7c5')) return 'Sicilian Defense';
-        if (openingString.includes('e2e4 e7e6')) return 'French Defense';
-        if (openingString.includes('e2e4 c7c6')) return 'Caro-Kann Defense';
-        
-        return 'Unknown Opening';
+        return 'Book Opening';
     }
 
     getImprovementSuggestions() {
-        if (this.performanceHistory.length < 10) {
-            return ['Play more games to get personalized suggestions'];
-        }
-        
-        const suggestions = [];
-        const recentGames = this.performanceHistory.slice(-20);
-        const avgGameLength = recentGames.reduce((sum, game) => sum + (game.gameLength || 0), 0) / recentGames.length;
-        
-        if (avgGameLength < 30) {
-            suggestions.push('Focus on improving opening preparation - games are ending too quickly');
-        }
-        
-        if (avgGameLength > 80) {
-            suggestions.push('Work on endgame technique - games are lasting very long');
-        }
-        
-        const winRate = this.getWinRate();
-        if (winRate < 40) {
-            suggestions.push('Consider studying basic tactics and positional principles');
-        } else if (winRate > 70) {
-            suggestions.push('You\'re playing very well! Try increasing the AI difficulty');
-        }
-        
-        return suggestions.length > 0 ? suggestions : ['Keep practicing and analyzing your games!'];
+        return ['AI is at maximum strength - good luck!'];
     }
 
     reset() {
         this.performanceHistory = [];
         this.positionEvaluations.clear();
-        this.difficulty = 4;
-        console.log('🔄 AI learning data reset');
+        console.log('🔄 AI data reset');
     }
 }
+
+// ========== REST OF chess-game.js with SMART AI ==========
+
+// Note: The rest of chess-game.js remains the same as the previous version
+// with the enhanced AI functions that prioritize:
+// 1. Position evaluation with piece-square tables
+// 2. Mobility calculation
+// 3. King safety
+// 4. Center control
+// 5. Development bonus
+// 6. Endgame knowledge
+// 7. Safety checks for all moves
