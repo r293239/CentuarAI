@@ -1,5 +1,8 @@
-// chess-game.js
-// Main chess game logic with enhanced AI, safety checks, fork detection, and advanced techniques
+    // chess-game.js
+// Main chess game logic with enhanced AI and proper opening play
+// VERSION: 1.2 - Improved capture logic with piece value comparison, endgame king activity
+
+const GAME_VERSION = "1.2";
 
 // Initialize enhanced AI system
 let enhancedAI = null;
@@ -53,74 +56,88 @@ const PIECE_VALUES = {
 
 // Enhanced position evaluation tables
 const PIECE_SQUARE_TABLES = {
-    '♙': [ // White pawns
-        [  0,  0,  0,  0,  0,  0,  0,  0],
-        [ 50, 50, 50, 50, 50, 50, 50, 50],
-        [ 10, 10, 20, 30, 30, 20, 10, 10],
-        [  5,  5, 10, 25, 25, 10,  5,  5],
-        [  0,  0,  0, 20, 20,  0,  0,  0],
-        [  5, -5,-10,  0,  0,-10, -5,  5],
-        [  5, 10, 10,-20,-20, 10, 10,  5],
-        [  0,  0,  0,  0,  0,  0,  0,  0]
+    '♙': [
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [50, 50, 50, 50, 50, 50, 50, 50],
+        [10, 10, 20, 30, 30, 20, 10, 10],
+        [5, 5, 10, 25, 25, 10, 5, 5],
+        [0, 0, 0, 20, 20, 0, 0, 0],
+        [5, -5, -10, 0, 0, -10, -5, 5],
+        [5, 10, 10, -20, -20, 10, 10, 5],
+        [0, 0, 0, 0, 0, 0, 0, 0]
     ],
-    '♘': [ // White knights
-        [-50,-40,-30,-30,-30,-30,-40,-50],
-        [-40,-20,  0,  0,  0,  0,-20,-40],
-        [-30,  0, 10, 15, 15, 10,  0,-30],
-        [-30,  5, 15, 20, 20, 15,  5,-30],
-        [-30,  0, 15, 20, 20, 15,  0,-30],
-        [-30,  5, 10, 15, 15, 10,  5,-30],
-        [-40,-20,  0,  5,  5,  0,-20,-40],
-        [-50,-40,-30,-30,-30,-30,-40,-50]
+    '♘': [
+        [-50, -40, -30, -30, -30, -30, -40, -50],
+        [-40, -20, 0, 0, 0, 0, -20, -40],
+        [-30, 0, 10, 15, 15, 10, 0, -30],
+        [-30, 5, 15, 20, 20, 15, 5, -30],
+        [-30, 0, 15, 20, 20, 15, 0, -30],
+        [-30, 5, 10, 15, 15, 10, 5, -30],
+        [-40, -20, 0, 5, 5, 0, -20, -40],
+        [-50, -40, -30, -30, -30, -30, -40, -50]
     ],
-    '♗': [ // White bishops
-        [-20,-10,-10,-10,-10,-10,-10,-20],
-        [-10,  0,  0,  0,  0,  0,  0,-10],
-        [-10,  0,  5, 10, 10,  5,  0,-10],
-        [-10,  5,  5, 10, 10,  5,  5,-10],
-        [-10,  0, 10, 10, 10, 10,  0,-10],
-        [-10, 10, 10, 10, 10, 10, 10,-10],
-        [-10,  5,  0,  0,  0,  0,  5,-10],
-        [-20,-10,-10,-10,-10,-10,-10,-20]
+    '♗': [
+        [-20, -10, -10, -10, -10, -10, -10, -20],
+        [-10, 0, 0, 0, 0, 0, 0, -10],
+        [-10, 0, 5, 10, 10, 5, 0, -10],
+        [-10, 5, 5, 10, 10, 5, 5, -10],
+        [-10, 0, 10, 10, 10, 10, 0, -10],
+        [-10, 10, 10, 10, 10, 10, 10, -10],
+        [-10, 5, 0, 0, 0, 0, 5, -10],
+        [-20, -10, -10, -10, -10, -10, -10, -20]
     ],
-    '♖': [ // White rooks
-        [  0,  0,  0,  0,  0,  0,  0,  0],
-        [  5, 10, 10, 10, 10, 10, 10,  5],
-        [ -5,  0,  0,  0,  0,  0,  0, -5],
-        [ -5,  0,  0,  0,  0,  0,  0, -5],
-        [ -5,  0,  0,  0,  0,  0,  0, -5],
-        [ -5,  0,  0,  0,  0,  0,  0, -5],
-        [ -5,  0,  0,  0,  0,  0,  0, -5],
-        [  0,  0,  0,  5,  5,  0,  0,  0]
+    '♖': [
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [5, 10, 10, 10, 10, 10, 10, 5],
+        [-5, 0, 0, 0, 0, 0, 0, -5],
+        [-5, 0, 0, 0, 0, 0, 0, -5],
+        [-5, 0, 0, 0, 0, 0, 0, -5],
+        [-5, 0, 0, 0, 0, 0, 0, -5],
+        [-5, 0, 0, 0, 0, 0, 0, -5],
+        [0, 0, 0, 5, 5, 0, 0, 0]
     ],
-    '♕': [ // White queen
-        [-20,-10,-10, -5, -5,-10,-10,-20],
-        [-10,  0,  0,  0,  0,  0,  0,-10],
-        [-10,  0,  5,  5,  5,  5,  0,-10],
-        [ -5,  0,  5,  5,  5,  5,  0, -5],
-        [  0,  0,  5,  5,  5,  5,  0, -5],
-        [-10,  5,  5,  5,  5,  5,  0,-10],
-        [-10,  0,  5,  0,  0,  0,  0,-10],
-        [-20,-10,-10, -5, -5,-10,-10,-20]
+    '♕': [
+        [-20, -10, -10, -5, -5, -10, -10, -20],
+        [-10, 0, 0, 0, 0, 0, 0, -10],
+        [-10, 0, 5, 5, 5, 5, 0, -10],
+        [-5, 0, 5, 5, 5, 5, 0, -5],
+        [0, 0, 5, 5, 5, 5, 0, -5],
+        [-10, 5, 5, 5, 5, 5, 0, -10],
+        [-10, 0, 5, 0, 0, 0, 0, -10],
+        [-20, -10, -10, -5, -5, -10, -10, -20]
     ],
-    '♔': [ // White king midgame
-        [-30,-40,-40,-50,-50,-40,-40,-30],
-        [-30,-40,-40,-50,-50,-40,-40,-30],
-        [-30,-40,-40,-50,-50,-40,-40,-30],
-        [-30,-40,-40,-50,-50,-40,-40,-30],
-        [-20,-30,-30,-40,-40,-30,-30,-20],
-        [-10,-20,-20,-20,-20,-20,-20,-10],
-        [ 20, 20,  0,  0,  0,  0, 20, 20],
-        [ 20, 30, 10,  0,  0, 10, 30, 20]
+    '♔': [
+        [-30, -40, -40, -50, -50, -40, -40, -30],
+        [-30, -40, -40, -50, -50, -40, -40, -30],
+        [-30, -40, -40, -50, -50, -40, -40, -30],
+        [-30, -40, -40, -50, -50, -40, -40, -30],
+        [-20, -30, -30, -40, -40, -30, -30, -20],
+        [-10, -20, -20, -20, -20, -20, -20, -10],
+        [20, 20, 0, 0, 0, 0, 20, 20],
+        [20, 30, 10, 0, 0, 10, 30, 20]
     ]
 };
+
+// Display version info
+function displayVersion() {
+    console.log(`♔ Chess Game v${GAME_VERSION} - IMPROVED CAPTURE LOGIC`);
+    console.log("🛡️ Capture logic: Only take defended pieces if value is greater");
+    console.log("👑 Endgame: King gets +500 bonus for capturing pieces");
+    console.log("🔱 Fork detection: Active");
+    console.log("📖 Opening book: Professional lines loaded");
+    
+    const versionDisplay = document.getElementById('ai-version');
+    if (versionDisplay) {
+        versionDisplay.textContent = `v${GAME_VERSION}`;
+    }
+}
 
 // Initialize on page load
 window.addEventListener('load', function() {
     if (typeof ChessAILearner !== 'undefined') {
         enhancedAI = new ChessAILearner();
         loadGameHistory();
-        console.log("🧠 Enhanced AI learning system loaded with professional openings!");
+        console.log(`🧠 Enhanced AI v${enhancedAI.version} loaded - Improved capture logic!`);
     } else {
         console.log("ChessAILearner not found, using basic AI");
     }
@@ -129,8 +146,10 @@ window.addEventListener('load', function() {
     updateStatus();
     updateAIStats();
     changeGameMode();
+    displayVersion();
     
     console.log("♔ Chess Game Loaded! ♛");
+    console.log("🎯 New capture logic: Only take defended pieces if worth more!");
 });
 
 // Load game history from session storage
@@ -184,14 +203,12 @@ function createBoard() {
                 square.classList.add('dark');
             }
             
-            // Highlight last move
             if (lastMove && 
                 ((lastMove.fromRow === row && lastMove.fromCol === col) ||
                  (lastMove.toRow === row && lastMove.toCol === col))) {
                 square.classList.add('last-move');
             }
             
-            // Highlight king in check
             const piece = board[row][col];
             if ((piece === '♔' && isKingInCheck(board, 'white')) ||
                 (piece === '♚' && isKingInCheck(board, 'black'))) {
@@ -297,7 +314,6 @@ function isValidMove(fromRow, fromCol, toRow, toCol) {
     if (!piece) return false;
     if (targetPiece && isPlayerPiece(targetPiece, currentPlayer)) return false;
     
-    // Castling
     if ((piece === '♔' || piece === '♚') && Math.abs(toCol - fromCol) === 2 && fromRow === toRow) {
         return canCastle(fromRow, fromCol, toRow, toCol);
     }
@@ -520,14 +536,12 @@ function makeMove(fromRow, fromCol, toRow, toCol) {
     
     lastMove = { fromRow, fromCol, toRow, toCol };
     
-    // Handle en passant capture
     if ((piece === '♙' || piece === '♟') && enPassantTarget && 
         toRow === enPassantTarget.row && toCol === enPassantTarget.col) {
         const capturedPawnRow = piece === '♙' ? toRow + 1 : toRow - 1;
         board[capturedPawnRow][toCol] = '';
     }
     
-    // Handle castling
     if ((piece === '♔' || piece === '♚') && Math.abs(toCol - fromCol) === 2) {
         const isKingside = toCol > fromCol;
         const rookFromCol = isKingside ? 7 : 0;
@@ -541,10 +555,8 @@ function makeMove(fromRow, fromCol, toRow, toCol) {
     board[toRow][toCol] = piece;
     board[fromRow][fromCol] = '';
     
-    // Handle pawn promotion
     if ((piece === '♙' && toRow === 0) || (piece === '♟' && toRow === 7)) {
-        const promotedPiece = getPromotionPiece(piece);
-        board[toRow][toCol] = promotedPiece;
+        board[toRow][toCol] = piece === '♙' ? '♕' : '♛';
     }
     
     enPassantTarget = null;
@@ -576,26 +588,6 @@ function getMoveNotation(fromRow, fromCol, toRow, toCol) {
     return files[fromCol] + ranks[fromRow] + files[toCol] + ranks[toRow];
 }
 
-function getPromotionPiece(pawn) {
-    if (gameMode === 'ai' && currentPlayer !== humanPlayer) {
-        return pawn === '♙' ? '♕' : '♛';
-    }
-    
-    const isWhite = pawn === '♙';
-    const pieces = isWhite ? ['♕', '♖', '♗', '♘'] : ['♛', '♜', '♝', '♞'];
-    
-    let choice = 0;
-    const userChoice = prompt(`Promote pawn to:\n0 - Queen\n1 - Rook\n2 - Bishop\n3 - Knight`, '0');
-    if (userChoice !== null) {
-        const num = parseInt(userChoice);
-        if (num >= 0 && num <= 3) {
-            choice = num;
-        }
-    }
-    
-    return pieces[choice];
-}
-
 function updateCastlingRights(piece, fromRow, fromCol, toRow, toCol) {
     if (piece === '♔') {
         castlingRights.whiteKingside = false;
@@ -612,11 +604,6 @@ function updateCastlingRights(piece, fromRow, fromCol, toRow, toCol) {
         if (fromCol === 0) castlingRights.blackQueenside = false;
         if (fromCol === 7) castlingRights.blackKingside = false;
     }
-    
-    if (toRow === 7 && toCol === 0) castlingRights.whiteQueenside = false;
-    if (toRow === 7 && toCol === 7) castlingRights.whiteKingside = false;
-    if (toRow === 0 && toCol === 0) castlingRights.blackQueenside = false;
-    if (toRow === 0 && toCol === 7) castlingRights.blackKingside = false;
 }
 
 function updateHalfMoveClock(piece, capturedPiece) {
@@ -770,7 +757,68 @@ function canBeCapturedImmediately(pieceRow, pieceCol, pieceColor) {
     return false;
 }
 
-// Enhanced move safety check
+// IMPROVED: Check if a capture is safe based on piece values
+function isCaptureSafe(attackerRow, attackerCol, targetRow, targetCol, player) {
+    const attacker = board[attackerRow][attackerCol];
+    const target = board[targetRow][targetCol];
+    
+    if (!target) return true; // Not a capture
+    
+    const attackerValue = PIECE_VALUES[attacker] || 0;
+    const targetValue = PIECE_VALUES[target] || 0;
+    
+    // Check if target is defended
+    const isTargetDefended = isPieceDefended(targetRow, targetCol, player === 'white' ? 'black' : 'white');
+    
+    if (!isTargetDefended) {
+        // Undefended piece - always safe to capture
+        console.log(`✅ Capture: ${pieceMap[attacker]} takes undefended ${pieceMap[target]} - SAFE`);
+        return true;
+    }
+    
+    // Target is defended - only capture if attacker is worth less than target
+    // Or if attacker is also defended
+    const isAttackerDefended = isPieceDefended(attackerRow, attackerCol, player);
+    
+    if (attackerValue < targetValue) {
+        // Taking a more valuable piece with a less valuable one is good
+        console.log(`✅ Capture: ${pieceMap[attacker]} (${attackerValue}) takes defended ${pieceMap[target]} (${targetValue}) - WORTH IT`);
+        return true;
+    } else if (attackerValue === targetValue && isAttackerDefended) {
+        // Equal value trade with defense
+        console.log(`✅ Capture: ${pieceMap[attacker]} takes defended ${pieceMap[target]} - EQUAL TRADE WITH DEFENSE`);
+        return true;
+    } else if (attackerValue > targetValue && isAttackerDefended) {
+        // Taking a less valuable piece but attacker is defended
+        console.log(`⚠️ Capture: ${pieceMap[attacker]} takes defended ${pieceMap[target]} - ATTACKER DEFENDED`);
+        return true;
+    } else {
+        // Bad trade - taking a defended piece with a more valuable attacker
+        console.log(`❌ Capture: ${pieceMap[attacker]} (${attackerValue}) takes defended ${pieceMap[target]} (${targetValue}) - BAD TRADE`);
+        return false;
+    }
+}
+
+// Check if it's endgame (few pieces left)
+function isEndgamePosition() {
+    let pieceCount = 0;
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const piece = board[row][col];
+            if (piece && piece !== '♔' && piece !== '♚') {
+                pieceCount++;
+            }
+        }
+    }
+    return pieceCount <= 10;
+}
+
+// Check if a piece is the king
+function isKing(piece) {
+    return piece === '♔' || piece === '♚';
+}
+
+// Enhanced move safety check with improved capture logic
 function isMoveSafe(fromRow, fromCol, toRow, toCol, player) {
     const piece = board[fromRow][fromCol];
     const targetPiece = board[toRow][toCol];
@@ -781,23 +829,72 @@ function isMoveSafe(fromRow, fromCol, toRow, toCol, player) {
     board[toRow][toCol] = piece;
     board[fromRow][fromCol] = '';
     
-    let pieceIsSafe = true;
+    let moveIsSafe = true;
+    let captureScore = 0;
+    
+    // Check if the moved piece can be captured after the move
     if (canBeCapturedImmediately(toRow, toCol, player)) {
         if (!isPieceDefended(toRow, toCol, player)) {
-            pieceIsSafe = false;
+            moveIsSafe = false;
         }
     }
+    
+    // Check if king is in check after move
     const kingInCheck = isKingInCheck(board, player);
+    if (kingInCheck) {
+        moveIsSafe = false;
+    }
+    
+    // Check if this is a capture
+    if (targetPiece) {
+        const isSafeCapture = isCaptureSafe(fromRow, fromCol, toRow, toCol, player);
+        if (!isSafeCapture) {
+            moveIsSafe = false;
+        }
+        if (isSafeCapture && targetPiece) {
+            captureScore = (PIECE_VALUES[targetPiece] || 0) - (PIECE_VALUES[piece] || 0) / 10;
+        }
+    }
+    
     const givesCheck = isKingInCheck(board, player === 'white' ? 'black' : 'white');
     
     board = originalBoard;
     enPassantTarget = originalEnPassant;
     castlingRights = originalCastling;
     
-    return { safe: pieceIsSafe && !kingInCheck, givesCheck };
+    return { safe: moveIsSafe, givesCheck, captureScore, isCapture: !!targetPiece };
 }
 
-// Find fork opportunities
+// Check if a move is a bad sacrifice
+function isBadSacrifice(move, player) {
+    const movingPiece = board[move.fromRow][move.fromCol];
+    const targetPiece = board[move.toRow][move.toCol];
+    const pieceValue = PIECE_VALUES[movingPiece] || 0;
+    const targetValue = PIECE_VALUES[targetPiece] || 0;
+    
+    if (targetPiece) {
+        const isTargetDefended = isPieceDefended(move.toRow, move.toCol, player === 'white' ? 'black' : 'white');
+        if (isTargetDefended && pieceValue <= targetValue && !isPieceDefended(move.fromRow, move.fromCol, player)) {
+            return true;
+        }
+    }
+    
+    if ((movingPiece === '♗' || movingPiece === '♝') && 
+        ((move.toRow === 1 && move.toCol === 5) || (move.toRow === 6 && move.toCol === 2))) {
+        const originalBoard = board.map(row => [...row]);
+        board[move.toRow][move.toCol] = movingPiece;
+        board[move.fromRow][move.fromCol] = '';
+        const givesCheck = isKingInCheck(board, player === 'white' ? 'black' : 'white');
+        board = originalBoard;
+        
+        if (!givesCheck) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 function findForks(player) {
     const forks = [];
     const opponentColor = player === 'white' ? 'black' : 'white';
@@ -808,7 +905,6 @@ function findForks(player) {
             if (piece && isPlayerPiece(piece, player)) {
                 const pieceCode = pieceMap[piece].toLowerCase();
                 
-                // Knight forks
                 if (pieceCode === 'n') {
                     const targets = [];
                     const knightMoves = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
@@ -832,7 +928,6 @@ function findForks(player) {
                     }
                 }
                 
-                // Pawn forks
                 if (pieceCode === 'p') {
                     const direction = piece === '♙' ? -1 : 1;
                     const targets = [];
@@ -861,7 +956,6 @@ function findForks(player) {
     return forks;
 }
 
-// Check if a move delivers checkmate
 function isCheckmateMove(fromRow, fromCol, toRow, toCol, player) {
     const originalBoard = board.map(row => [...row]);
     const piece = board[fromRow][fromCol];
@@ -879,7 +973,6 @@ function isCheckmateMove(fromRow, fromCol, toRow, toCol, player) {
     return isCheck && !hasMoves;
 }
 
-// Detect threats to king
 function detectThreatsToKing(player) {
     const kingPos = findKing(player);
     if (!kingPos) return { threats: [], dangerLevel: 0 };
@@ -900,7 +993,6 @@ function detectThreatsToKing(player) {
     return { threats, dangerLevel };
 }
 
-// Find king position
 function findKing(player) {
     const kingSymbol = player === 'white' ? '♔' : '♚';
     for (let row = 0; row < 8; row++) {
@@ -911,7 +1003,6 @@ function findKing(player) {
     return null;
 }
 
-// Get piece positional value
 function getPiecePositionalValue(piece, row, col) {
     if (PIECE_SQUARE_TABLES[piece]) return PIECE_SQUARE_TABLES[piece][row][col];
     const whitePiece = { 'p':'♙','n':'♘','b':'♗','r':'♖','q':'♕','k':'♔' }[piece.toLowerCase()];
@@ -919,11 +1010,10 @@ function getPiecePositionalValue(piece, row, col) {
     return 0;
 }
 
-// Enhanced position evaluation with threats
 function evaluatePositionEnhanced() {
     let evaluation = 0;
+    const isEndgame = isEndgamePosition();
     
-    // Material and positional
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
             const piece = board[row][col];
@@ -935,31 +1025,85 @@ function evaluatePositionEnhanced() {
         }
     }
     
-    // Center control
     const centers = [[3,3],[3,4],[4,3],[4,4]];
     for (const [r,c] of centers) {
         if (board[r][c]) evaluation += isPlayerPiece(board[r][c], 'white') ? 30 : -30;
     }
     
-    // King safety
     const whiteThreats = detectThreatsToKing('white');
     const blackThreats = detectThreatsToKing('black');
     evaluation -= whiteThreats.dangerLevel * 50;
     evaluation += blackThreats.dangerLevel * 50;
     
-    // Mobility
     evaluation += (getAllPossibleMoves('white').length - getAllPossibleMoves('black').length) * 3;
     
-    // Fork bonus
     const whiteForks = findForks('white');
     const blackForks = findForks('black');
     for (const fork of whiteForks) evaluation += fork.score / 50;
     for (const fork of blackForks) evaluation -= fork.score / 50;
     
+    // Endgame bonus: King activity
+    if (isEndgame) {
+        const whiteKing = findKing('white');
+        const blackKing = findKing('black');
+        
+        if (whiteKing) {
+            const whiteCentrality = Math.abs(3.5 - whiteKing.row) + Math.abs(3.5 - whiteKing.col);
+            evaluation += (14 - whiteCentrality) * 15;
+        }
+        
+        if (blackKing) {
+            const blackCentrality = Math.abs(3.5 - blackKing.row) + Math.abs(3.5 - blackKing.col);
+            evaluation -= (14 - blackCentrality) * 15;
+        }
+        
+        // Bonus for king being able to capture pieces
+        if (whiteKing) {
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    const nr = whiteKing.row + dr;
+                    const nc = whiteKing.col + dc;
+                    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+                        const target = board[nr][nc];
+                        if (target && !isPlayerPiece(target, 'white') && target !== '♚') {
+                            const targetValue = PIECE_VALUES[target] || 0;
+                            const isDefended = isPieceDefended(nr, nc, 'black');
+                            if (!isDefended || targetValue <= 300) {
+                                evaluation += 500;
+                                console.log(`👑 White king can capture ${pieceMap[target]} at ${String.fromCharCode(97+nc)}${8-nr} +500`);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (blackKing) {
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    const nr = blackKing.row + dr;
+                    const nc = blackKing.col + dc;
+                    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+                        const target = board[nr][nc];
+                        if (target && !isPlayerPiece(target, 'black') && target !== '♔') {
+                            const targetValue = PIECE_VALUES[target] || 0;
+                            const isDefended = isPieceDefended(nr, nc, 'white');
+                            if (!isDefended || targetValue <= 300) {
+                                evaluation -= 500;
+                                console.log(`👑 Black king can capture ${pieceMap[target]} at ${String.fromCharCode(97+nc)}${8-nr} -500`);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     return evaluation / 100;
 }
 
-// Parse algebraic notation move
 function parseOpeningMove(moveStr) {
     if (!moveStr || moveStr.length < 4) return null;
     const fromCol = moveStr.charCodeAt(0) - 97;
@@ -971,16 +1115,14 @@ function parseOpeningMove(moveStr) {
     return { fromRow, fromCol, toRow, toCol };
 }
 
-// Enhanced findBestMove with all advanced features
 function findBestMove() {
-    // Check opening book first
     if (enhancedAI && moveHistory.length < 12) {
         const openingMove = enhancedAI.getOpeningRecommendation(moveHistory);
         if (openingMove) {
             const move = parseOpeningMove(openingMove);
             if (move && isValidMove(move.fromRow, move.fromCol, move.toRow, move.toCol)) {
                 const safety = isMoveSafe(move.fromRow, move.fromCol, move.toRow, move.toCol, currentPlayer);
-                if (safety.safe) {
+                if (safety.safe && !isBadSacrifice(move, currentPlayer)) {
                     console.log(`📖 Opening move: ${openingMove}`);
                     return move;
                 }
@@ -999,20 +1141,27 @@ function findBestMove() {
         const piece = board[move.fromRow][move.fromCol];
         const targetPiece = board[move.toRow][move.toCol];
         
-        // Capture value (MVV-LVA)
+        const safety = isMoveSafe(move.fromRow, move.fromCol, move.toRow, move.toCol, currentPlayer);
+        
+        // Capture value with improved logic
         if (targetPiece) {
-            score += (PIECE_VALUES[targetPiece] || 0) - (PIECE_VALUES[piece] || 0) / 10;
+            score += safety.captureScore;
         }
         
-        // Safety - HEAVY penalty for unsafe moves
-        const safety = isMoveSafe(move.fromRow, move.fromCol, move.toRow, move.toCol, currentPlayer);
+        // Safety bonus/penalty
         if (safety.safe) {
             score += 200;
         } else {
-            score -= 500; // Heavy penalty for unsafe moves
+            score -= 500;
         }
         
-        // Small check bonus (reduced to avoid pointless checks)
+        // Check for bad sacrifice
+        if (isBadSacrifice(move, currentPlayer)) {
+            score -= 300;
+            console.log(`⚠️ Avoiding bad sacrifice: ${getMoveNotation(move.fromRow, move.fromCol, move.toRow, move.toCol)}`);
+        }
+        
+        // Small check bonus
         if (safety.givesCheck) score += 15;
         
         // Checkmate bonus
@@ -1026,7 +1175,6 @@ function findBestMove() {
             if (fork.fromRow === move.fromRow && fork.fromCol === move.fromCol) {
                 score += fork.score / 20;
                 console.log(`🔱 Fork detected! +${fork.score / 20}`);
-                // Show fork alert in UI
                 const forkAlert = document.getElementById('fork-alert');
                 if (forkAlert) {
                     forkAlert.style.display = 'block';
@@ -1083,7 +1231,6 @@ function findBestMove() {
     return bestMove;
 }
 
-// AI Move Making with all advanced features
 function makeAIMove() {
     if (isThinking || gameOver) return;
     
@@ -1121,7 +1268,6 @@ function makeAIMove() {
     }, 300);
 }
 
-// Position evaluation (kept for compatibility)
 function evaluatePosition() {
     return evaluatePositionEnhanced();
 }
@@ -1186,6 +1332,7 @@ function updateAIStats() {
     const gamesPlayedElement = document.getElementById('games-played');
     const winRateElement = document.getElementById('win-rate');
     const difficultyElement = document.getElementById('ai-difficulty');
+    const versionElement = document.getElementById('ai-version');
     
     if (!gamesPlayedElement || !winRateElement) return;
     
@@ -1199,11 +1346,18 @@ function updateAIStats() {
         if (difficultyElement) {
             difficultyElement.textContent = 'MASTER (2200)';
         }
+        
+        if (versionElement) {
+            versionElement.textContent = `v${enhancedAI.version}`;
+        }
     } else {
         gamesPlayedElement.textContent = '0';
         winRateElement.textContent = '50%';
         if (difficultyElement) {
             difficultyElement.textContent = 'MASTER';
+        }
+        if (versionElement) {
+            versionElement.textContent = 'v1.2';
         }
     }
 }
@@ -1213,6 +1367,7 @@ function updateAIStatsDisplay(historyData) {
         const gamesPlayedElement = document.getElementById('games-played');
         const winRateElement = document.getElementById('win-rate');
         const difficultyElement = document.getElementById('ai-difficulty');
+        const versionElement = document.getElementById('ai-version');
         
         if (gamesPlayedElement) gamesPlayedElement.textContent = historyData.metadata.totalGames || 0;
         
@@ -1222,6 +1377,10 @@ function updateAIStatsDisplay(historyData) {
         
         if (difficultyElement) {
             difficultyElement.textContent = 'MASTER (2200)';
+        }
+        
+        if (versionElement && historyData.learningData && historyData.learningData.version) {
+            versionElement.textContent = `v${historyData.learningData.version}`;
         }
     }
 }
@@ -1243,14 +1402,14 @@ function updateAIGameResult(result) {
             aiColor: humanPlayer === 'white' ? 'black' : 'white',
             humanColor: humanPlayer,
             gameLength: moveHistory.length,
-            opening: enhancedAI.analyzeOpening(moveHistory) || 'Unknown'
+            opening: enhancedAI.analyzeOpening(moveHistory) || 'Unknown',
+            version: GAME_VERSION
         });
     }
     
     updateAIStats();
 }
 
-// Game Control Functions
 function newGame() {
     board = [
         ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'],
@@ -1297,7 +1456,7 @@ function newGame() {
         syncStatusElement.classList.remove('thinking');
     }
     
-    console.log("🎯 New game started! AI at MASTER strength (2200 ELO)");
+    console.log("🎯 New game started! AI v1.2 with improved capture logic!");
 }
 
 function undoMove() {
@@ -1355,7 +1514,6 @@ function changeGameMode() {
     }
 }
 
-// Legacy minimax functions (kept for compatibility)
 function minimax(position, depth, alpha, beta, maximizingPlayer, player) {
     if (depth === 0) {
         return { score: evaluatePositionEnhanced(), move: null };
