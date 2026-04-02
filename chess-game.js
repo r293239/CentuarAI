@@ -3,7 +3,7 @@
 // VERSION: 2.3 - Fully integrated with ChessAILearner opening book
 // COMPATIBLE WITH: chess-ai-database.js (v2.0)
 
-const GAME_VERSION = "2.3";
+const GAME_VERSION = "2.3.1";
 
 // ========== PERSISTENT MEMORY TREE SYSTEM ==========
 class PersistentMoveTree {
@@ -566,10 +566,19 @@ function isValidPawnMove(piece, fromRow, fromCol, toRow, toCol, dx, dy) {
     const absDx = Math.abs(dx);
 
     if (dx === 0) {
+        // Moving forward one square
         if (dy === direction && !board[toRow][toCol]) return true;
-        if (fromRow === startRow && dy === 2 * direction && !board[toRow][toCol]) return true;
+        
+        // Moving two squares forward from starting position
+        if (fromRow === startRow && dy === 2 * direction && !board[toRow][toCol]) {
+            // Check if the square in between is empty
+            const intermediateRow = fromRow + direction;
+            if (!board[intermediateRow][fromCol]) return true;
+        }
     } else if (absDx === 1 && dy === direction) {
+        // Capturing diagonally
         if (board[toRow][toCol]) return true;
+        // En passant capture
         if (enPassantTarget && toRow === enPassantTarget.row && toCol === enPassantTarget.col) {
             return true;
         }
@@ -1056,7 +1065,10 @@ function isValidMoveForPosition(boardState, fromRow, fromCol, toRow, toCol, play
             const startRow = pieceCode === 'P' ? 6 : 1;
             if (dx === 0) {
                 if (dy === direction && !boardState[toRow][toCol]) valid = true;
-                if (fromRow === startRow && dy === 2 * direction && !boardState[toRow][toCol]) valid = true;
+                if (fromRow === startRow && dy === 2 * direction && !boardState[toRow][toCol]) {
+                    const intermediateRow = fromRow + direction;
+                    if (!boardState[intermediateRow][fromCol]) valid = true;
+                }
             } else if (absDx === 1 && dy === direction && boardState[toRow][toCol]) {
                 valid = true;
             }
